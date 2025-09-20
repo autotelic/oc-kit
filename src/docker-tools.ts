@@ -15,6 +15,17 @@ import {
   IMAGE_ACTIONS,
   SPECIAL_ARG_ACTIONS
 } from './docker-command-utils.js'
+import { 
+  validateContainerName,
+  validateImageName,
+  validateDockerArgs
+} from './security-validation.js'
+import {
+  checkOperationGuardrails,
+  checkDockerVolumeMounts,
+  checkDockerNetworkSettings,
+  DEFAULT_SECURITY_CONFIG
+} from './security-guardrails.js'
 
 /**
  * Builds a Docker command based on the provided arguments
@@ -28,6 +39,16 @@ export function buildDockerCommand(args: ToolArgs): string[] | string {
   }
 
   const action = args.action!
+
+  // Check security guardrails for the operation
+  const guardrailResult = checkOperationGuardrails(action, args.args, DEFAULT_SECURITY_CONFIG)
+  if (!guardrailResult.allowed) {
+    return `Security: ${guardrailResult.reason}`
+  }
+  if (guardrailResult.requiresConfirmation) {
+    return `Security Warning: ${guardrailResult.reason}. Add --confirm flag to proceed.`
+  }
+
   const baseCommand = ['docker', action]
 
   // Validate required parameters based on action
@@ -36,12 +57,54 @@ export function buildDockerCommand(args: ToolArgs): string[] | string {
     if (!validation.valid) {
       return validation.error!
     }
+    
+    // Validate container name format
+    if (args.container) {
+      const containerValidation = validateContainerName(args.container)
+      if (!containerValidation.valid) {
+        return `Invalid container name: ${containerValidation.error}`
+      }
+    }
   }
 
   if (IMAGE_ACTIONS.has(action)) {
     const validation = validateRequiredParam('image', args.image, action)
     if (!validation.valid) {
       return validation.error!
+    }
+    
+    // Validate image name format
+    if (args.image) {
+      const imageValidation = validateImageName(args.image)
+      if (!imageValidation.valid) {
+        return `Invalid image name: ${imageValidation.error}`
+      }
+    }
+  }
+
+  // Validate Docker-specific arguments if provided
+  if (args.args && args.args.length > 0) {
+    const argsValidation = validateDockerArgs(args.args)
+    if (!argsValidation.valid) {
+      return `Invalid arguments: ${argsValidation.error}`
+    }
+
+    // Check for dangerous volume mounts
+    const volumeCheck = checkDockerVolumeMounts(args.args)
+    if (!volumeCheck.allowed) {
+      return `Security: ${volumeCheck.reason}`
+    }
+    if (volumeCheck.requiresConfirmation) {
+      return `Security Warning: ${volumeCheck.reason}. Add --confirm flag to proceed.`
+    }
+
+    // Check for dangerous network settings
+    const networkCheck = checkDockerNetworkSettings(args.args)
+    if (!networkCheck.allowed) {
+      return `Security: ${networkCheck.reason}`
+    }
+    if (networkCheck.requiresConfirmation) {
+      return `Security Warning: ${networkCheck.reason}. Add --confirm flag to proceed.`
     }
   }
 

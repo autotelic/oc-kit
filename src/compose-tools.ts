@@ -15,6 +15,13 @@ import {
   resolveTargetServices,
   SPECIAL_ARG_ACTIONS
 } from './docker-command-utils.js'
+import { validateDockerArgs } from './security-validation.js'
+import {
+  checkOperationGuardrails,
+  checkDockerVolumeMounts,
+  checkDockerNetworkSettings,
+  DEFAULT_SECURITY_CONFIG
+} from './security-guardrails.js'
 
 /**
  * Builds a Docker Compose command based on the provided arguments
@@ -29,6 +36,42 @@ export function buildComposeCommand(args: ToolArgs, capabilities: any): string[]
   }
 
   const action = args.action!
+
+  // Check security guardrails for the operation
+  const guardrailResult = checkOperationGuardrails(action, args.args, DEFAULT_SECURITY_CONFIG)
+  if (!guardrailResult.allowed) {
+    return `Security: ${guardrailResult.reason}`
+  }
+  if (guardrailResult.requiresConfirmation) {
+    return `Security Warning: ${guardrailResult.reason}. Add --confirm flag to proceed.`
+  }
+
+  // Validate Docker-specific arguments if provided
+  if (args.args && args.args.length > 0) {
+    const argsValidation = validateDockerArgs(args.args)
+    if (!argsValidation.valid) {
+      return `Invalid arguments: ${argsValidation.error}`
+    }
+
+    // Check for dangerous volume mounts
+    const volumeCheck = checkDockerVolumeMounts(args.args)
+    if (!volumeCheck.allowed) {
+      return `Security: ${volumeCheck.reason}`
+    }
+    if (volumeCheck.requiresConfirmation) {
+      return `Security Warning: ${volumeCheck.reason}. Add --confirm flag to proceed.`
+    }
+
+    // Check for dangerous network settings
+    const networkCheck = checkDockerNetworkSettings(args.args)
+    if (!networkCheck.allowed) {
+      return `Security: ${networkCheck.reason}`
+    }
+    if (networkCheck.requiresConfirmation) {
+      return `Security Warning: ${networkCheck.reason}. Add --confirm flag to proceed.`
+    }
+  }
+
   const baseCommand = ['docker-compose']
 
   // Add compose file if needed

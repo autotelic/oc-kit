@@ -6,6 +6,8 @@ import type { ToolArgs, OpenCodeContext } from './types.js'
 import { detectPackageManager, getPackageJson, getScripts, buildPackageCommand } from './package-manager.js'
 import { wrapWithDoppler } from './doppler.js'
 import { executeCommand, formatCommandResult } from './execution.js'
+import { validateScriptName, validateArgumentArray } from './security-validation.js'
+import { checkScriptGuardrails, DEFAULT_SECURITY_CONFIG } from './security-guardrails.js'
 
 /**
  * Executes a package.json script with package manager auto-detection and Doppler integration
@@ -18,12 +20,35 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
   const workingDir = args.cwd || context.cwd || process.cwd()
 
   try {
-    const packageJson = await getPackageJson(workingDir)
-    const scripts = getScripts(packageJson)
-
     if (!args.script) {
       return 'Error: script parameter is required'
     }
+
+    // Validate script name
+    const scriptValidation = validateScriptName(args.script)
+    if (!scriptValidation.valid) {
+      return `Invalid script name: ${scriptValidation.error}`
+    }
+
+    // Check security guardrails for the script
+    const guardrailResult = checkScriptGuardrails(args.script, DEFAULT_SECURITY_CONFIG)
+    if (!guardrailResult.allowed) {
+      return `Security: ${guardrailResult.reason}`
+    }
+    if (guardrailResult.requiresConfirmation) {
+      return `Security Warning: ${guardrailResult.reason}. Add --confirm flag to proceed.`
+    }
+
+    // Validate arguments if provided
+    if (args.args && args.args.length > 0) {
+      const argsValidation = validateArgumentArray(args.args)
+      if (!argsValidation.valid) {
+        return `Invalid arguments: ${argsValidation.error}`
+      }
+    }
+
+    const packageJson = await getPackageJson(workingDir)
+    const scripts = getScripts(packageJson)
 
     if (!scripts[args.script]) {
       const availableScripts = Object.keys(scripts)

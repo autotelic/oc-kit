@@ -12,7 +12,7 @@
  * @see https://opencode.ai/docs/custom-tools
  */
 
-import type { ToolArgs } from './types.js'
+import type { ToolArgs, OpenCodeContext } from './types.js'
 import { executePackageScript, listPackageScripts } from './package-tools.js'
 import { executeDockerCommand } from './docker-tools.js'
 import { executeComposeCommand } from './compose-tools.js'
@@ -68,8 +68,8 @@ export default tool({
     packageManager: tool.schema.enum(['npm', 'yarn', 'pnpm', 'bun']).optional().describe('Package manager to use (auto-detected if not specified)'),
     skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)')
   },
-  async execute(args: ToolArgs): Promise<string> {
-    return executePackageScript(args)
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executePackageScript(args, context)
   }
 })
 
@@ -84,8 +84,8 @@ export const list = tool({
   args: {
     cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
   },
-  async execute(args: ToolArgs): Promise<string> {
-    return listPackageScripts(args)
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return listPackageScripts(args, context)
   }
 })
 
@@ -107,8 +107,8 @@ export const docker = tool({
     timeout: tool.schema.number().optional().describe('Timeout in milliseconds (default: 30s for logs, 5min for build/pull, 30s for others)'),
     skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)')
   },
-  async execute(args: ToolArgs): Promise<string> {
-    return executeDockerCommand(args)
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDockerCommand(args, context)
   }
 })
 
@@ -131,8 +131,8 @@ export const compose = tool({
     timeout: tool.schema.number().optional().describe('Timeout in milliseconds (default: 30s for logs, 5min for build/up/pull, 30s for others)'),
     skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)')
   },
-  async execute(args: ToolArgs): Promise<string> {
-    return executeComposeCommand(args)
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeComposeCommand(args, context)
   }
 })
 
@@ -147,7 +147,7 @@ export const dockerList = tool({
   args: {
     cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
   },
-  async execute(args: ToolArgs): Promise<string> {
-    return listDockerCapabilities(args)
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return listDockerCapabilities(args, context)
   }
 })

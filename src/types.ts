@@ -3,6 +3,20 @@
  */
 
 /**
+ * OpenCode context information passed to custom tools
+ */
+export interface OpenCodeContext {
+  /** Current session ID */
+  sessionID: string
+  /** Current message ID */
+  messageID: string
+  /** Agent name or identifier */
+  agent: string
+  /** Working directory for the current session */
+  cwd?: string
+}
+
+/**
  * Arguments passed to all kit tools
  */
 export interface ToolArgs {

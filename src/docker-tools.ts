@@ -2,7 +2,7 @@
  * Docker tool implementations
  */
 
-import type { ToolArgs } from './types.js'
+import type { ToolArgs, OpenCodeContext } from './types.js'
 import { getDockerCapabilities } from './docker.js'
 import { wrapWithDoppler } from './doppler.js'
 import { executeCommand, formatCommandResult, getDockerTimeout } from './execution.js'
@@ -92,10 +92,11 @@ export function buildDockerCommand(args: ToolArgs): string[] | string {
 /**
  * Executes a Docker command with proper error handling and Doppler integration
  * @param args - Tool arguments containing Docker action and parameters
+ * @param context - OpenCode context with session information
  * @returns Promise resolving to formatted command result
  */
-export async function executeDockerCommand(args: ToolArgs): Promise<string> {
-  const workingDir = args.cwd || process.cwd()
+export async function executeDockerCommand(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+  const workingDir = args.cwd || context.cwd || process.cwd()
   const capabilities = await getDockerCapabilities(workingDir)
 
   // Validate Docker availability

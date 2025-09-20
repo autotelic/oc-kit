@@ -2,7 +2,7 @@
  * Package.json script tool implementations
  */
 
-import type { ToolArgs } from './types.js'
+import type { ToolArgs, OpenCodeContext } from './types.js'
 import { detectPackageManager, getPackageJson, getScripts, buildPackageCommand } from './package-manager.js'
 import { wrapWithDoppler } from './doppler.js'
 import { executeCommand, formatCommandResult } from './execution.js'
@@ -10,10 +10,12 @@ import { executeCommand, formatCommandResult } from './execution.js'
 /**
  * Executes a package.json script with package manager auto-detection and Doppler integration
  * @param args - Tool arguments containing script name and parameters
+ * @param context - OpenCode context containing session information
  * @returns Promise resolving to formatted command result
  */
-export async function executePackageScript(args: ToolArgs): Promise<string> {
-  const workingDir = args.cwd || process.cwd()
+export async function executePackageScript(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+  // Use context working directory, then args.cwd, then fallback to process.cwd()
+  const workingDir = args.cwd || context.cwd || process.cwd()
 
   try {
     const packageJson = await getPackageJson(workingDir)
@@ -45,10 +47,12 @@ export async function executePackageScript(args: ToolArgs): Promise<string> {
 /**
  * Lists all available package.json scripts in the current project
  * @param args - Tool arguments containing optional working directory
+ * @param context - OpenCode context containing session information
  * @returns Promise resolving to formatted list of available scripts
  */
-export async function listPackageScripts(args: ToolArgs): Promise<string> {
-  const workingDir = args.cwd || process.cwd()
+export async function listPackageScripts(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+  // Use context working directory, then args.cwd, then fallback to process.cwd()
+  const workingDir = args.cwd || context.cwd || process.cwd()
 
   try {
     const packageJson = await getPackageJson(workingDir)

@@ -35,7 +35,7 @@
     "build": "bun run typecheck && bun build src/kit.ts --outdir=dist --target=bun",
     "typecheck": "tsc --noEmit",
     "lint": "bun run typecheck",
-    "test": "echo \"Tests not implemented yet\" && exit 0",
+    "test": "bun test src/",
     "dev": "bun run build --watch",
     "clean": "rm -rf dist",
     "install-tools": "mkdir -p .opencode/tool && cp tool/* .opencode/tool/",

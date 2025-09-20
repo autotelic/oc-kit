@@ -60,7 +60,7 @@ kit_docker { action: "logs", container: "myapp" }
 
 - `kit` - **Primary tool**: Run package.json scripts with smart automation
 - `kit_list` - List all available scripts in current project
-- `kit_docker_list` - Show Docker capabilities (always available)
+- `kit_dockerList` - Show Docker capabilities (always available)
 - `kit_docker` - Container operations (requires Docker)
 - `kit_compose` - Docker Compose operations (requires compose files)
 
@@ -76,7 +76,7 @@ kit { script: "dev" }            // Perfect for development workflows
 
 ### Docker Operations Made Simple
 ```typescript
-kit_docker_list {}                                    // See what's available
+kit_dockerList {}                                     // See what's available
 kit_compose { action: "up", profile: "database" }     // Start only DB services
 kit_compose { action: "logs", services: ["postgres"] } // Targeted logging
 kit_docker { action: "ps" }                          // Container status

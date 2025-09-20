@@ -2,7 +2,7 @@
  * Docker Compose tool implementations
  */
 
-import type { ToolArgs } from './types.js'
+import type { ToolArgs, OpenCodeContext } from './types.js'
 import { getDockerCapabilities } from './docker.js'
 import { wrapWithDoppler } from './doppler.js'
 import { executeCommand, formatCommandResult, getComposeTimeout } from './execution.js'
@@ -89,10 +89,11 @@ export function buildComposeCommand(args: ToolArgs, capabilities: any): string[]
 /**
  * Executes a Docker Compose command with proper error handling and Doppler integration
  * @param args - Tool arguments containing Compose action and parameters
+ * @param context - OpenCode context with session information
  * @returns Promise resolving to formatted command result
  */
-export async function executeComposeCommand(args: ToolArgs): Promise<string> {
-  const workingDir = args.cwd || process.cwd()
+export async function executeComposeCommand(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+  const workingDir = args.cwd || context.cwd || process.cwd()
   const capabilities = await getDockerCapabilities(workingDir)
 
   // Validate Docker and Compose availability

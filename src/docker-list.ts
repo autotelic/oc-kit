@@ -2,16 +2,17 @@
  * Docker listing and capability discovery tool
  */
 
-import type { ToolArgs } from './types.js'
+import type { ToolArgs, OpenCodeContext } from './types.js'
 import { getDockerCapabilities } from './docker.js'
 
 /**
  * Lists Docker capabilities and discovered files in the current project
  * @param args - Tool arguments containing optional working directory
+ * @param context - OpenCode context with session information
  * @returns Promise resolving to formatted Docker capabilities report
  */
-export async function listDockerCapabilities(args: ToolArgs): Promise<string> {
-  const workingDir = args.cwd || process.cwd()
+export async function listDockerCapabilities(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+  const workingDir = args.cwd || context.cwd || process.cwd()
   const capabilities = await getDockerCapabilities(workingDir)
 
   const output: string[] = []

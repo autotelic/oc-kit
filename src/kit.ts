@@ -13,22 +13,6 @@
  */
 
 // Types for opencode plugin compatibility
-interface SchemaDescribe {
-  describe: (description: string) => SchemaDescribe
-}
-
-interface SchemaOptional extends SchemaDescribe {
-  optional: () => SchemaDescribe
-}
-
-interface ToolSchema {
-  string: () => SchemaDescribe
-  array: (type: SchemaDescribe) => SchemaOptional
-  enum: (values: string[]) => SchemaOptional
-  boolean: () => SchemaOptional
-  number: () => SchemaOptional
-}
-
 interface ToolArgs {
   script?: string
   args?: string[]
@@ -46,43 +30,28 @@ interface ToolArgs {
   detach?: boolean
 }
 
-interface ToolFunction {
-  schema: ToolSchema
-  (config: { description: string; args: Record<string, any>; execute: (args: ToolArgs) => Promise<string> }): any
-}
-
-interface ToolModule {
-  tool: ToolFunction
-}
-
-// Dynamic import for @opencode-ai/plugin to handle development environments
-// @ts-ignore - Module may not be available during development
-const toolModule: ToolModule = await import('@opencode-ai/plugin').catch((): ToolModule => {
-  // Mock for development when plugin is not available
-  const createSchemaDescribe = (): SchemaDescribe => ({ 
-    describe: (d: string) => createSchemaDescribe()
-  })
-  
-  const createSchemaOptional = (): SchemaOptional => {
-    const base = createSchemaDescribe()
-    return Object.assign(base, {
-      optional: () => createSchemaDescribe()
-    })
+const toolModule = await import('@opencode-ai/plugin').catch(() => {
+  const mockDescribe = { 
+    describe: (_d: string) => mockDescribe,
+    optional: () => mockDescribe,
+    _zod: true as any
   }
-
+  const mockOptional = { 
+    describe: (_d: string) => mockOptional,
+    optional: () => mockDescribe,
+    _zod: true as any
+  }
+  
   return {
-    tool: Object.assign(
-      (config: { description: string; args: Record<string, any>; execute: (args: ToolArgs) => Promise<string> }) => config,
-      {
-        schema: {
-          string: createSchemaDescribe,
-          array: () => createSchemaOptional(),
-          enum: () => createSchemaOptional(),
-          boolean: () => createSchemaOptional(),
-          number: () => createSchemaOptional()
-        }
+    tool: Object.assign((config: any) => config, {
+      schema: {
+        string: () => mockDescribe,
+        array: () => mockOptional,
+        enum: () => mockOptional,
+        boolean: () => mockOptional,
+        number: () => mockOptional
       }
-    )
+    })
   }
 })
 const { tool } = toolModule
@@ -571,7 +540,7 @@ async function wrapWithDoppler (
     return command
   }
 
-  if (command[0] === 'docker-compose' && command.length > 1 && isReadOnlyAction(command[1])) {
+  if (command[0] === 'docker-compose' && command.length > 1 && command[1] && isReadOnlyAction(command[1])) {
     return command
   }
 
@@ -611,12 +580,16 @@ const dockerTool = tool({
     timeout: tool.schema.number().optional().describe('Timeout in milliseconds (default: 30s for logs, 5min for build/pull, 30s for others)'),
     skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)')
   },
-  async execute (args) {
+  async execute (args: ToolArgs): Promise<string> {
     const workingDir = args.cwd || process.cwd()
     const capabilities = await getDockerCapabilities(workingDir)
 
     if (!capabilities.dockerAvailable) {
       return 'Error: Docker is not available on this system. Please install Docker to use this tool.'
+    }
+
+    if (!args.action) {
+      return 'Error: action parameter is required'
     }
 
     const baseCommand = ['docker', args.action]
@@ -637,7 +610,7 @@ const dockerTool = tool({
         if (!args.container) return 'Error: container parameter is required for exec action'
         baseCommand.push('-it', args.container)
         if (args.args && args.args.length > 0) {
-          baseCommand.push(...args.args)
+          baseCommand.push(...args.args.filter((arg): arg is string => arg !== undefined))
         } else {
           baseCommand.push('/bin/sh')
         }
@@ -664,8 +637,8 @@ const dockerTool = tool({
         break
     }
 
-    if (args.args && args.args.length > 0 && !['exec'].includes(args.action)) {
-      baseCommand.push(...args.args)
+    if (args.args && args.args.length > 0 && !['exec'].includes(args.action || '')) {
+      baseCommand.push(...args.args.filter((arg): arg is string => arg !== undefined))
     }
 
     const getTimeout = () => {
@@ -693,7 +666,7 @@ const dockerTool = tool({
       })
 
       const timeoutMs = getTimeout()
-      const timeoutPromise = new Promise<never>((resolve, reject) => {
+      const timeoutPromise = new Promise<never>((_resolve, reject) => {
         setTimeout(() => reject(new Error(`Command timed out after ${timeoutMs}ms`)), timeoutMs)
       })
 
@@ -734,7 +707,7 @@ const composeTool = tool({
     timeout: tool.schema.number().optional().describe('Timeout in milliseconds (default: 30s for logs, 5min for build/up/pull, 30s for others)'),
     skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)')
   },
-  async execute (args) {
+  async execute (args: ToolArgs): Promise<string> {
     const workingDir = args.cwd || process.cwd()
     const capabilities = await getDockerCapabilities(workingDir)
 
@@ -754,9 +727,13 @@ const composeTool = tool({
       const mainComposeFile = capabilities.composeFiles.find(f => f.endsWith('docker-compose.yaml') || f.endsWith('docker-compose.yml')
       ) || capabilities.composeFiles[0]
 
-      if (!mainComposeFile.endsWith('docker-compose.yaml') && !mainComposeFile.endsWith('docker-compose.yml')) {
+      if (mainComposeFile && !mainComposeFile.endsWith('docker-compose.yaml') && !mainComposeFile.endsWith('docker-compose.yml')) {
         baseCommand.push('-f', mainComposeFile)
       }
+    }
+
+    if (!args.action) {
+      return 'Error: action parameter is required'
     }
 
     baseCommand.push(args.action)
@@ -764,7 +741,7 @@ const composeTool = tool({
     let targetServices: string[] = []
 
     if (args.profile && capabilities.profiles[args.profile]) {
-      targetServices = capabilities.profiles[args.profile]
+      targetServices = capabilities.profiles[args.profile] || []
     } else if (args.services && args.services.length > 0) {
       targetServices = args.services
     }
@@ -788,9 +765,13 @@ const composeTool = tool({
         if (targetServices.length > 1) {
           return 'Error: exec action can only target one service at a time'
         }
-        baseCommand.push(targetServices[0])
+        const targetService = targetServices[0]
+        if (!targetService) {
+          return 'Error: no target service found'
+        }
+        baseCommand.push(targetService)
         if (args.args && args.args.length > 0) {
-          baseCommand.push(...args.args)
+          baseCommand.push(...args.args.filter((arg): arg is string => arg !== undefined))
         } else {
           baseCommand.push('/bin/sh')
         }
@@ -831,7 +812,7 @@ const composeTool = tool({
       })
 
       const timeoutMs = getTimeout()
-      const timeoutPromise = new Promise<never>((resolve, reject) => {
+      const timeoutPromise = new Promise<never>((_resolve, reject) => {
         setTimeout(() => reject(new Error(`Command timed out after ${timeoutMs}ms`)), timeoutMs)
       })
 
@@ -864,7 +845,7 @@ export const list = tool({
   args: {
     cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
   },
-  async execute (args) {
+  async execute (args: ToolArgs): Promise<string> {
     const workingDir = args.cwd || process.cwd()
     // eslint-disable-next-line no-undef
     const packagePath = Bun.resolveSync('./package.json', workingDir)
@@ -896,7 +877,7 @@ const dockerListTool = tool({
   args: {
     cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
   },
-  async execute (args) {
+  async execute (args: ToolArgs): Promise<string> {
     const workingDir = args.cwd || process.cwd()
     const capabilities = await getDockerCapabilities(workingDir)
 

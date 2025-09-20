@@ -1,0 +1,62 @@
+{
+  "name": "@autotelic/oc-kit",
+  "version": "1.0.0",
+  "description": "Custom automation tools for opencode that replace bash commands with smart package.json script and Docker operations",
+  "main": "src/kit.ts",
+  "module": "src/kit.ts",
+  "type": "module",
+  "private": true,
+  "author": "Autotelic",
+  "license": "MIT",
+  "keywords": [
+    "opencode",
+    "automation",
+    "docker",
+    "package-manager",
+    "doppler",
+    "bun",
+    "npm",
+    "yarn",
+    "pnpm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/autotelic/oc-kit.git"
+  },
+  "homepage": "https://github.com/autotelic/oc-kit",
+  "bugs": {
+    "url": "https://github.com/autotelic/oc-kit/issues"
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "bun run typecheck && bun build src/kit.ts --outdir=dist --target=bun",
+    "typecheck": "tsc --noEmit",
+    "lint": "bun run typecheck",
+    "test": "echo \"Tests not implemented yet\" && exit 0",
+    "dev": "bun run build --watch",
+    "clean": "rm -rf dist",
+    "install-tools": "mkdir -p .opencode/tool && cp tool/* .opencode/tool/",
+    "prepare": "bun run build"
+  },
+  "files": [
+    "src/",
+    "tool/",
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@opencode-ai/plugin": "^0.10.0",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^0.10.3"
+  }
+}

@@ -4,10 +4,18 @@
 
 import type { DopplerCapabilities } from './types.js'
 
+/** Cache for Doppler capabilities to avoid repeated detection */
 let dopplerCapabilitiesCache: DopplerCapabilities | null = null
+/** Directory for which capabilities are cached */
 let dopplerCacheDir: string | null = null
+/** Promise for in-flight detection to prevent concurrent calls */
 let dopplerCachePromise: Promise<DopplerCapabilities> | null = null
 
+/**
+ * Gets Doppler capabilities for a directory with caching
+ * @param workingDir - Directory to check for Doppler configuration
+ * @returns Promise resolving to Doppler capabilities
+ */
 export async function getDopplerCapabilities(workingDir: string): Promise<DopplerCapabilities> {
   if (dopplerCapabilitiesCache && dopplerCacheDir === workingDir) {
     return dopplerCapabilitiesCache
@@ -30,6 +38,11 @@ export async function getDopplerCapabilities(workingDir: string): Promise<Dopple
   return capabilities
 }
 
+/**
+ * Detects Doppler CLI availability and configuration in a directory
+ * @param workingDir - Directory to check for Doppler setup
+ * @returns Promise resolving to detected capabilities
+ */
 async function detectDopplerCapabilities(workingDir: string): Promise<DopplerCapabilities> {
   const capabilities: DopplerCapabilities = {
     available: false,
@@ -46,6 +59,10 @@ async function detectDopplerCapabilities(workingDir: string): Promise<DopplerCap
   return capabilities
 }
 
+/**
+ * Checks if Doppler CLI is installed and accessible
+ * @returns Promise resolving to true if Doppler CLI is available
+ */
 async function checkDopplerAvailability(): Promise<boolean> {
   try {
     // eslint-disable-next-line no-undef
@@ -60,6 +77,11 @@ async function checkDopplerAvailability(): Promise<boolean> {
   }
 }
 
+/**
+ * Checks for Doppler configuration files in the working directory
+ * @param workingDir - Directory to search for config files
+ * @param capabilities - Capabilities object to update with findings
+ */
 async function checkDopplerConfig(workingDir: string, capabilities: DopplerCapabilities) {
   // Check for doppler.yaml first
   // eslint-disable-next-line no-undef
@@ -96,6 +118,14 @@ async function checkDopplerConfig(workingDir: string, capabilities: DopplerCapab
   }
 }
 
+/**
+ * Wraps a command with Doppler if available and appropriate
+ * @param command - Command array to potentially wrap
+ * @param workingDir - Directory to check for Doppler configuration
+ * @param skipDoppler - Whether to skip Doppler wrapping
+ * @param action - Action being performed (for read-only detection)
+ * @returns Promise resolving to potentially wrapped command
+ */
 export async function wrapWithDoppler(
   command: string[],
   workingDir: string,
@@ -125,6 +155,11 @@ export async function wrapWithDoppler(
   return ['doppler', 'run', '--', ...command]
 }
 
+/**
+ * Determines if an action is read-only and should skip Doppler wrapping
+ * @param action - Action string to check
+ * @returns True if the action is read-only
+ */
 function isReadOnlyAction(action: string): boolean {
   const readOnlyActions = new Set([
     'ps', 'logs', 'list', 'version', '--version', '--help',

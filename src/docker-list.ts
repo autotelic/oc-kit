@@ -5,6 +5,11 @@
 import type { ToolArgs } from './types.js'
 import { getDockerCapabilities } from './docker.js'
 
+/**
+ * Lists Docker capabilities and discovered files in the current project
+ * @param args - Tool arguments containing optional working directory
+ * @returns Promise resolving to formatted Docker capabilities report
+ */
 export async function listDockerCapabilities(args: ToolArgs): Promise<string> {
   const workingDir = args.cwd || process.cwd()
   const capabilities = await getDockerCapabilities(workingDir)

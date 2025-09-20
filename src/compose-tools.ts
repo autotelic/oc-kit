@@ -6,37 +6,44 @@ import type { ToolArgs } from './types.js'
 import { getDockerCapabilities } from './docker.js'
 import { wrapWithDoppler } from './doppler.js'
 import { executeCommand, formatCommandResult, getComposeTimeout } from './execution.js'
+import {
+  validateAction,
+  validateDockerAvailable,
+  validateComposeAvailable,
+  addAdditionalArgs,
+  resolveComposeFile,
+  resolveTargetServices,
+  SPECIAL_ARG_ACTIONS
+} from './docker-command-utils.js'
 
+/**
+ * Builds a Docker Compose command based on the provided arguments
+ * @param args - Tool arguments containing action and parameters
+ * @param capabilities - Docker capabilities for file and service resolution
+ * @returns Command array ready for execution or error string
+ */
 export function buildComposeCommand(args: ToolArgs, capabilities: any): string[] | string {
-  if (!args.action) {
-    return 'Error: action parameter is required'
+  const actionValidation = validateAction(args.action)
+  if (!actionValidation.valid) {
+    return actionValidation.error!
   }
 
+  const action = args.action!
   const baseCommand = ['docker-compose']
 
-  if (args.file) {
-    baseCommand.push('-f', args.file)
-  } else if (capabilities.composeFiles.length > 0) {
-    const mainComposeFile = capabilities.composeFiles.find((f: string) => 
-      f.endsWith('docker-compose.yaml') || f.endsWith('docker-compose.yml')
-    ) || capabilities.composeFiles[0]
-
-    if (mainComposeFile && !mainComposeFile.endsWith('docker-compose.yaml') && !mainComposeFile.endsWith('docker-compose.yml')) {
-      baseCommand.push('-f', mainComposeFile)
-    }
+  // Add compose file if needed
+  const composeFile = resolveComposeFile(args, capabilities)
+  if (composeFile) {
+    baseCommand.push('-f', composeFile)
   }
 
-  baseCommand.push(args.action)
+  baseCommand.push(action)
 
-  let targetServices: string[] = []
+  // Resolve target services
+  const targetServices = resolveTargetServices(args, capabilities)
 
-  if (args.profile && capabilities.profiles[args.profile]) {
-    targetServices = capabilities.profiles[args.profile] || []
-  } else if (args.services && args.services.length > 0) {
-    targetServices = args.services
-  }
-
-  switch (args.action) {
+  // Handle action-specific logic
+  switch (action) {
     case 'up':
       if (args.detach !== false) {
         baseCommand.push('-d')
@@ -64,14 +71,14 @@ export function buildComposeCommand(args: ToolArgs, capabilities: any): string[]
       } else {
         baseCommand.push('/bin/sh')
       }
-      targetServices = []
-      break
+      // Don't add target services again for exec
+      return baseCommand
   }
 
-  if (args.args && args.args.length > 0 && args.action !== 'exec') {
-    baseCommand.push(...args.args)
-  }
+  // Add additional arguments for actions that support them
+  addAdditionalArgs(baseCommand, args, Array.from(SPECIAL_ARG_ACTIONS))
 
+  // Add target services if any
   if (targetServices.length > 0) {
     baseCommand.push(...targetServices)
   }
@@ -79,16 +86,24 @@ export function buildComposeCommand(args: ToolArgs, capabilities: any): string[]
   return baseCommand
 }
 
+/**
+ * Executes a Docker Compose command with proper error handling and Doppler integration
+ * @param args - Tool arguments containing Compose action and parameters
+ * @returns Promise resolving to formatted command result
+ */
 export async function executeComposeCommand(args: ToolArgs): Promise<string> {
   const workingDir = args.cwd || process.cwd()
   const capabilities = await getDockerCapabilities(workingDir)
 
-  if (!capabilities.dockerAvailable) {
-    return 'Error: Docker is not available on this system. Please install Docker to use this tool.'
+  // Validate Docker and Compose availability
+  const dockerValidation = validateDockerAvailable(capabilities)
+  if (!dockerValidation.valid) {
+    return dockerValidation.error!
   }
 
-  if (capabilities.composeFiles.length === 0) {
-    return 'Error: No Docker Compose files found in this project.'
+  const composeValidation = validateComposeAvailable(capabilities)
+  if (!composeValidation.valid) {
+    return composeValidation.error!
   }
 
   const commandOrError = buildComposeCommand(args, capabilities)

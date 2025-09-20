@@ -7,6 +7,11 @@ import { detectPackageManager, getPackageJson, getScripts, buildPackageCommand }
 import { wrapWithDoppler } from './doppler.js'
 import { executeCommand, formatCommandResult } from './execution.js'
 
+/**
+ * Executes a package.json script with package manager auto-detection and Doppler integration
+ * @param args - Tool arguments containing script name and parameters
+ * @returns Promise resolving to formatted command result
+ */
 export async function executePackageScript(args: ToolArgs): Promise<string> {
   const workingDir = args.cwd || process.cwd()
 
@@ -37,6 +42,11 @@ export async function executePackageScript(args: ToolArgs): Promise<string> {
   }
 }
 
+/**
+ * Lists all available package.json scripts in the current project
+ * @param args - Tool arguments containing optional working directory
+ * @returns Promise resolving to formatted list of available scripts
+ */
 export async function listPackageScripts(args: ToolArgs): Promise<string> {
   const workingDir = args.cwd || process.cwd()
 

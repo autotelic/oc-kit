@@ -6,15 +6,47 @@ import type { ToolArgs } from './types.js'
 import { getDockerCapabilities } from './docker.js'
 import { wrapWithDoppler } from './doppler.js'
 import { executeCommand, formatCommandResult, getDockerTimeout } from './execution.js'
+import { 
+  validateAction, 
+  validateRequiredParam, 
+  validateDockerAvailable,
+  addAdditionalArgs,
+  CONTAINER_ACTIONS,
+  IMAGE_ACTIONS,
+  SPECIAL_ARG_ACTIONS
+} from './docker-command-utils.js'
 
+/**
+ * Builds a Docker command based on the provided arguments
+ * @param args - Tool arguments containing action and parameters
+ * @returns Command array ready for execution or error string
+ */
 export function buildDockerCommand(args: ToolArgs): string[] | string {
-  if (!args.action) {
-    return 'Error: action parameter is required'
+  const actionValidation = validateAction(args.action)
+  if (!actionValidation.valid) {
+    return actionValidation.error!
   }
 
-  const baseCommand = ['docker', args.action]
+  const action = args.action!
+  const baseCommand = ['docker', action]
 
-  switch (args.action) {
+  // Validate required parameters based on action
+  if (CONTAINER_ACTIONS.has(action)) {
+    const validation = validateRequiredParam('container', args.container, action)
+    if (!validation.valid) {
+      return validation.error!
+    }
+  }
+
+  if (IMAGE_ACTIONS.has(action)) {
+    const validation = validateRequiredParam('image', args.image, action)
+    if (!validation.valid) {
+      return validation.error!
+    }
+  }
+
+  // Build command based on action
+  switch (action) {
     case 'build':
       if (args.tag) baseCommand.push('-t', args.tag)
       if (args.image) baseCommand.push(args.image)
@@ -22,13 +54,11 @@ export function buildDockerCommand(args: ToolArgs): string[] | string {
       break
 
     case 'run':
-      if (!args.image) return 'Error: image parameter is required for run action'
-      baseCommand.push(args.image)
+      baseCommand.push(args.image!)
       break
 
     case 'exec':
-      if (!args.container) return 'Error: container parameter is required for exec action'
-      baseCommand.push('-it', args.container)
+      baseCommand.push('-it', args.container!)
       if (args.args && args.args.length > 0) {
         baseCommand.push(...args.args.filter((arg): arg is string => arg !== undefined))
       } else {
@@ -37,38 +67,41 @@ export function buildDockerCommand(args: ToolArgs): string[] | string {
       break
 
     case 'logs':
-      if (!args.container) return 'Error: container parameter is required for logs action'
-      baseCommand.push('--tail', '100', args.container)
+      baseCommand.push('--tail', '100', args.container!)
       break
 
     case 'stop':
     case 'start':
     case 'restart':
     case 'rm':
-      if (!args.container) return `Error: container parameter is required for ${args.action} action`
-      baseCommand.push(args.container)
+      baseCommand.push(args.container!)
       break
 
     case 'pull':
     case 'push':
-      if (!args.image) return `Error: image parameter is required for ${args.action} action`
-      baseCommand.push(args.image)
+      baseCommand.push(args.image!)
       break
   }
 
-  if (args.args && args.args.length > 0 && !['exec'].includes(args.action || '')) {
-    baseCommand.push(...args.args.filter((arg): arg is string => arg !== undefined))
-  }
+  // Add additional arguments for actions that support them
+  addAdditionalArgs(baseCommand, args, Array.from(SPECIAL_ARG_ACTIONS))
 
   return baseCommand
 }
 
+/**
+ * Executes a Docker command with proper error handling and Doppler integration
+ * @param args - Tool arguments containing Docker action and parameters
+ * @returns Promise resolving to formatted command result
+ */
 export async function executeDockerCommand(args: ToolArgs): Promise<string> {
   const workingDir = args.cwd || process.cwd()
   const capabilities = await getDockerCapabilities(workingDir)
 
-  if (!capabilities.dockerAvailable) {
-    return 'Error: Docker is not available on this system. Please install Docker to use this tool.'
+  // Validate Docker availability
+  const dockerValidation = validateDockerAvailable(capabilities)
+  if (!dockerValidation.valid) {
+    return dockerValidation.error!
   }
 
   const commandOrError = buildDockerCommand(args)

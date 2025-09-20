@@ -4,10 +4,18 @@
 
 import type { DockerCapabilities } from './types.js'
 
+/** Cache for Docker capabilities to avoid repeated filesystem scanning */
 let dockerCapabilitiesCache: DockerCapabilities | null = null
+/** Directory for which capabilities are cached */
 let cacheDir: string | null = null
+/** Promise for in-flight detection to prevent concurrent scans */
 let dockerCachePromise: Promise<DockerCapabilities> | null = null
 
+/**
+ * Gets Docker capabilities for a directory with caching
+ * @param workingDir - Directory to scan for Docker files and configuration
+ * @returns Promise resolving to Docker capabilities
+ */
 export async function getDockerCapabilities(workingDir: string): Promise<DockerCapabilities> {
   if (dockerCapabilitiesCache && cacheDir === workingDir) {
     return dockerCapabilitiesCache
@@ -33,6 +41,11 @@ export async function getDockerCapabilities(workingDir: string): Promise<DockerC
   return capabilities
 }
 
+/**
+ * Detects Docker capabilities by scanning for files and checking CLI availability
+ * @param workingDir - Directory to scan for Docker-related files
+ * @returns Promise resolving to detected Docker capabilities
+ */
 async function detectDockerCapabilities(workingDir: string): Promise<DockerCapabilities> {
   const capabilities: DockerCapabilities = {
     dockerAvailable: false,
@@ -53,6 +66,10 @@ async function detectDockerCapabilities(workingDir: string): Promise<DockerCapab
   return capabilities
 }
 
+/**
+ * Checks if Docker CLI is installed and accessible
+ * @returns Promise resolving to true if Docker CLI is available
+ */
 async function checkDockerAvailability(): Promise<boolean> {
   try {
     // eslint-disable-next-line no-undef
@@ -67,6 +84,11 @@ async function checkDockerAvailability(): Promise<boolean> {
   }
 }
 
+/**
+ * Scans directory for Dockerfile and related files
+ * @param dir - Directory to search for Dockerfiles
+ * @param capabilities - Capabilities object to update with findings
+ */
 async function findDockerfiles(dir: string, capabilities: DockerCapabilities) {
   // eslint-disable-next-line no-undef
   const dockerfileGlob = new Bun.Glob('**/Dockerfile*')
@@ -85,6 +107,11 @@ async function findDockerfiles(dir: string, capabilities: DockerCapabilities) {
   }
 }
 
+/**
+ * Scans directory for Docker Compose files and parses their content
+ * @param dir - Directory to search for Compose files
+ * @param capabilities - Capabilities object to update with findings
+ */
 async function findAndParseComposeFiles(dir: string, capabilities: DockerCapabilities) {
   const composePatterns = [
     '**/docker-compose.yml',
@@ -110,6 +137,11 @@ async function findAndParseComposeFiles(dir: string, capabilities: DockerCapabil
   }
 }
 
+/**
+ * Parses a Docker Compose file to extract services, networks, and volumes
+ * @param filePath - Path to the Compose file to parse
+ * @param capabilities - Capabilities object to update with parsed information
+ */
 async function parseComposeFile(filePath: string, capabilities: DockerCapabilities) {
   try {
     // eslint-disable-next-line no-undef
@@ -164,6 +196,11 @@ async function parseComposeFile(filePath: string, capabilities: DockerCapabiliti
   }
 }
 
+/**
+ * Generates service profiles based on service names for convenient grouping
+ * Creates profiles like 'database', 'cache', 'test', 'dev', and 'all'
+ * @param capabilities - Capabilities object to update with generated profiles
+ */
 function generateServiceProfiles(capabilities: DockerCapabilities) {
   const services = Array.from(capabilities.services)
 

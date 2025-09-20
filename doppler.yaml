@@ -1,0 +1,22 @@
+# Doppler configuration for testing kit tools
+# This is a dummy config to demonstrate Doppler integration
+
+# Note: This file is for testing only - no real secrets are stored here
+# The kit tools will auto-detect this file and wrap commands with "doppler run --"
+
+project: oc-kit-test
+config: dev
+
+# Environment setup
+setup:
+  # Dummy environment variables for testing
+  TEST_API_KEY: "dummy-key-for-testing"
+  TEST_DATABASE_URL: "postgresql://localhost:5432/test"
+  TEST_REDIS_URL: "redis://localhost:6379"
+  NODE_ENV: "development"
+  
+# This config allows us to test:
+# - Doppler auto-detection by kit tools
+# - Command wrapping with "doppler run --"
+# - Environment variable injection
+# - No-op behavior when Doppler isn't actually installed

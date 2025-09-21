@@ -10,5 +10,8 @@ export {
   devStop as kit_devStop,
   devRestart as kit_devRestart,
   devStartAll as kit_devStartAll,
-  devQuery as kit_devQuery
+  devQuery as kit_devQuery,
+  astGrepSearch as kit_astGrepSearch,
+  astGrepScan as kit_astGrepScan,
+  astGrepDump as kit_astGrepDump
 } from '../src/kit.js'

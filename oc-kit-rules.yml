@@ -1,0 +1,270 @@
+rules:
+  # === ARCHITECTURE PATTERNS ===
+  
+  - id: tool-export-complete
+    message: "Complete tool export pattern detected"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        export const $NAME = tool({
+          description: $DESC,
+          args: {
+            $$$ARGS
+          },
+          async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+            $$$BODY
+          }
+        })
+    note: "Standard kit tool export pattern - well structured"
+
+  - id: working-directory-pattern
+    message: "Proper working directory resolution"
+    severity: info
+    language: typescript
+    rule:
+      pattern: resolveWorkingDirectory(args, context)
+    note: "Good practice: using context-aware working directory resolution"
+
+  - id: bun-api-usage
+    message: "Bun native API usage"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: Bun.spawn($$$)
+        - pattern: Bun.file($$$)
+        - pattern: Bun.resolveSync($$$)
+        - pattern: Bun.write($$$)
+    note: "Using Bun native APIs for performance"
+
+  # === SECURITY PATTERNS ===
+
+  - id: security-validation-required
+    message: "Security validation should be applied"
+    severity: warning
+    language: typescript
+    rule:
+      pattern: |
+        if (!args.script) {
+          $$$
+        }
+    inside:
+      any:
+        - pattern: |
+            export async function $FUNC(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+              $$$
+            }
+        - pattern: |
+            async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+              $$$
+            }
+    not:
+      has:
+        any:
+          - pattern: validateScriptName($$$)
+          - pattern: validateArgumentArray($$$)
+          - pattern: checkScriptGuardrails($$$)
+    note: "Consider adding security validation for script parameters"
+
+  - id: security-validation-good
+    message: "Security validation properly implemented"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: validateScriptName($SCRIPT)
+        - pattern: validateArgumentArray($ARGS)
+        - pattern: checkScriptGuardrails($SCRIPT, $CONFIG)
+    note: "Good practice: security validation in use"
+
+  - id: command-injection-risk
+    message: "Potential command injection - ensure proper validation"
+    severity: warning
+    language: typescript
+    rule:
+      pattern: |
+        Bun.spawn([$CMD, $$$ARGS], $$$)
+    constraints:
+      CMD:
+        not:
+          regex: "^['\"`][a-zA-Z0-9-_]+['\"`]$"
+    note: "Ensure command is properly validated/sanitized"
+
+  # === ERROR HANDLING PATTERNS ===
+
+  - id: missing-error-handling
+    message: "Missing error handling for async operations"
+    severity: warning
+    language: typescript
+    rule:
+      pattern: |
+        await $FUNC($$$)
+    inside:
+      any:
+        - kind: function_declaration
+        - kind: method_definition
+        - kind: arrow_function
+      not:
+        any:
+          - has:
+              pattern: try
+          - has:
+              pattern: catch
+          - has:
+              pattern: |
+                } catch ($ERR) {
+                  return `Error: ${($ERR as Error).message}`
+                }
+    note: "Consider adding try-catch for error handling"
+
+  - id: proper-error-formatting
+    message: "Proper error formatting pattern"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        return `Error: ${($ERR as Error).message}`
+    note: "Good practice: consistent error message formatting"
+
+  # === OPENCODE TOOL PATTERNS ===
+
+  - id: missing-tool-description
+    message: "Tool export missing proper description"
+    severity: warning
+    language: typescript
+    rule:
+      pattern: |
+        export const $NAME = tool({
+          description: $DESC,
+          $$$
+        })
+    constraints:
+      DESC:
+        regex: "^['\"`][a-zA-Z ]{0,20}['\"`]$"
+    note: "Tool descriptions should be descriptive (>20 chars) for better UX"
+
+  - id: execute-function-pattern
+    message: "Standard execute function signature"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+          $$$
+        }
+    note: "Standard opencode tool execute function signature"
+
+  # === IMPORT PATTERNS ===
+
+  - id: relative-import-from-core
+    message: "Core module import detected"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        import { $$$IMPORTS } from '../core/$MODULE.js'
+    note: "Importing from core modules - good architecture"
+
+  - id: relative-import-from-utils
+    message: "Utility module import detected"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        import { $$$IMPORTS } from '../utils/$MODULE.js'
+    note: "Importing from utility modules"
+
+  - id: bun-test-import
+    message: "Bun test framework usage"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        import { $$$IMPORTS } from 'bun:test'
+    note: "Using Bun's native test framework"
+
+  # === PERFORMANCE PATTERNS ===
+
+  - id: streaming-execution
+    message: "Streaming execution for long-running commands"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: executeWithStreaming($$$)
+        - pattern: shouldUseStreaming($$$)
+        - pattern: createProgressLogger($$$)
+    note: "Good practice: streaming for better UX on long operations"
+
+  - id: timeout-configuration
+    message: "Timeout properly configured"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        timeout: $TIMEOUT
+    inside:
+      pattern: |
+        executeCommand($$$, {
+          $$$
+        })
+    note: "Good practice: timeout configuration for command execution"
+
+  # === DOPPLER INTEGRATION ===
+
+  - id: doppler-integration
+    message: "Doppler integration for environment variables"
+    severity: info
+    language: typescript
+    rule:
+      pattern: wrapWithDoppler($$$)
+    note: "Good practice: using Doppler for secure env var management"
+
+  - id: skip-doppler-option
+    message: "Skip Doppler option available"
+    severity: info
+    language: typescript
+    rule:
+      pattern: skipDoppler
+    note: "Flexibility: allowing users to skip Doppler if needed"
+
+  # === TYPE SAFETY PATTERNS ===
+
+  - id: type-assertion-as-error
+    message: "Type assertion for error handling"
+    severity: info
+    language: typescript
+    rule:
+      pattern: ($ERR as Error)
+    note: "Type safety: proper error type assertion"
+
+  - id: toolargs-context-params
+    message: "Standard tool parameter pattern"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        (args: ToolArgs, context: OpenCodeContext)
+    note: "Standard parameter pattern for kit tools"
+
+  # === TESTING PATTERNS ===
+
+  - id: mock-context-usage
+    message: "Mock context for testing"
+    severity: info
+    language: typescript
+    rule:
+      pattern: mockContext
+    note: "Good practice: using mock context in tests"
+
+  - id: expect-assertions
+    message: "Test assertions"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: expect($VAL).toContain($$$)
+        - pattern: expect($VAL).toBeDefined()
+        - pattern: expect($VAL).not.toContain($$$)
+    note: "Test assertions for validation"

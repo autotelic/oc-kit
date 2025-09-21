@@ -54,6 +54,26 @@ export interface ToolArgs {
   query?: string
   /** Parameters for SQL query operations */
   params?: any[]
+  /** AST-grep pattern for semantic code search */
+  pattern?: string
+  /** Programming language for ast-grep operations */
+  language?: string
+  /** Path to search/scan (for ast-grep operations) */
+  path?: string
+  /** Number of context lines around matches */
+  context?: number
+  /** Maximum number of results to return */
+  maxResults?: number
+  /** Additional arguments for various tools */
+  extraArgs?: string[]
+  /** YAML rule content for ast-grep scan */
+  rule?: string
+  /** Path to YAML rule file */
+  ruleFile?: string
+  /** Output format (json, pretty, etc.) */
+  format?: string
+  /** Code snippet for ast-grep dump operations */
+  code?: string
 }
 
 /**

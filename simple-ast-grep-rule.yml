@@ -1,0 +1,6 @@
+id: tool-export-pattern
+message: "Kit tool export pattern detected"
+severity: info
+language: typescript
+rule:
+  pattern: export const $NAME = tool($$$)

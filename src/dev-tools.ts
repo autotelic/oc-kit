@@ -425,3 +425,85 @@ export async function executeDevRestart(args: ToolArgs, context: OpenCodeContext
     return `Error restarting development servers: ${(error as Error).message}`
   }
 }
+
+/**
+ * Start multiple development services at once
+ */
+export async function executeDevStartAll(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+  const workingDir = args.cwd || context.cwd || process.cwd()
+  
+  try {
+    // Get list of scripts to start
+    let scriptsToStart: string[] = []
+    
+    if (args.scripts && Array.isArray(args.scripts)) {
+      scriptsToStart = args.scripts
+    } else if (args.profile) {
+      // Predefined service profiles
+      const profiles: Record<string, string[]> = {
+        'dev': ['dev', 'start'],
+        'test': ['test-server', 'test-server-2'],
+        'backend': ['api', 'worker', 'scheduler'],
+        'frontend': ['dev', 'storybook'],
+        'full': ['api', 'worker', 'dev', 'docs']
+      }
+      
+      if (profiles[args.profile]) {
+        scriptsToStart = profiles[args.profile]!
+      } else {
+        const availableProfiles = Object.keys(profiles)
+        return `Unknown profile: \`${args.profile}\`. Available profiles: ${availableProfiles.join(', ')}`
+      }
+    } else {
+      // Auto-detect common development scripts
+      const packageJson = await getPackageJson(workingDir)
+      const scripts = getScripts(packageJson)
+      
+      const commonDevScripts = ['dev', 'start', 'serve', 'api', 'frontend', 'backend', 'worker']
+      scriptsToStart = commonDevScripts.filter(script => scripts[script])
+      
+      if (scriptsToStart.length === 0) {
+        const availableScripts = Object.keys(scripts)
+        return `No common development scripts found. Available scripts: ${availableScripts.join(', ')}\n\nSpecify scripts manually: kit_devStartAll { scripts: ["script1", "script2"] }`
+      }
+    }
+    
+    if (scriptsToStart.length === 0) {
+      return `No scripts specified to start`
+    }
+    
+    // Start each script
+    let results: string[] = []
+    let successCount = 0
+    
+    for (const script of scriptsToStart) {
+      try {
+        const startResult = await executeDevStart({ ...args, script }, context)
+        
+        if (startResult.includes('Started') || startResult.includes('already running')) {
+          results.push(`✅ ${script}: Started successfully`)
+          successCount++
+        } else {
+          results.push(`❌ ${script}: ${startResult}`)
+        }
+        
+        // Small delay between starts to avoid port conflicts
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+      } catch (error) {
+        results.push(`❌ ${script}: Error - ${(error as Error).message}`)
+      }
+    }
+    
+    const summary = `🚀 **Started ${successCount}/${scriptsToStart.length} Development Services**\n\n${results.join('\n')}`
+    
+    if (successCount > 0) {
+      return `${summary}\n\n✅ Use \`kit_devStatus\` to monitor all running services`
+    } else {
+      return summary
+    }
+    
+  } catch (error) {
+    return `Error starting multiple development services: ${(error as Error).message}`
+  }
+}

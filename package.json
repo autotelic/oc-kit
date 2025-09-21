@@ -38,6 +38,7 @@
     "test": "bun test src/",
     "dev": "bun run build --watch",
     "test-server": "bun run test-server.ts",
+    "test-server-2": "bun run test-server-2.ts",
     "clean": "rm -rf dist",
     "install-tools": "mkdir -p .opencode/tool && cp tool/* .opencode/tool/",
     "prepare": "bun run build"

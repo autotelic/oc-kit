@@ -17,7 +17,7 @@ import { executePackageScript, listPackageScripts } from './package-tools.js'
 import { executeDockerCommand } from './docker-tools.js'
 import { executeComposeCommand } from './compose-tools.js'
 import { listDockerCapabilities } from './docker-list.js'
-import { executeDevStart, executeDevStatus, executeDevStop, executeDevRestart } from './dev-tools.js'
+import { executeDevStart, executeDevStatus, executeDevStop, executeDevRestart, executeDevStartAll } from './dev-tools.js'
 
 // OpenCode plugin compatibility layer
 const toolModule = await import('@opencode-ai/plugin').catch(() => {
@@ -217,5 +217,23 @@ export const devRestart = tool({
   },
   async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
     return executeDevRestart(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for starting multiple development services at once.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devStartAll = tool({
+  description: 'Start multiple development services at once. Supports service profiles and script arrays.',
+  args: {
+    scripts: tool.schema.array(tool.schema.string()).optional().describe('Array of script names to start'),
+    profile: tool.schema.string().optional().describe('Service profile: dev, test, backend, frontend, full'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevStartAll(args, context)
   }
 })

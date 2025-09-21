@@ -1,17 +1,17 @@
 {
   "processes": {
-    "test-server-/Users/togmund/autotelic/oc-kit": {
-      "pid": 13156,
-      "script": "test-server",
+    "test-server-2-/Users/togmund/autotelic/oc-kit": {
+      "pid": 17870,
+      "script": "test-server-2",
       "cwd": "/Users/togmund/autotelic/oc-kit",
-      "startTime": 1758416513049,
+      "startTime": 1758416691536,
       "command": [
         "doppler",
         "run",
         "--",
         "bun",
         "run",
-        "test-server"
+        "test-server-2"
       ]
     }
   }

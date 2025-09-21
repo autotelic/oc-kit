@@ -22,6 +22,8 @@ export interface OpenCodeContext {
 export interface ToolArgs {
   /** Name of the script to run (for package.json scripts) */
   script?: string
+  /** Array of scripts to run (for multi-service operations) */
+  scripts?: string[]
   /** Additional command line arguments to pass */
   args?: string[]
   /** Working directory to execute commands in */

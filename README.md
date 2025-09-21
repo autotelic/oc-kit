@@ -1,159 +1,321 @@
 # @autotelic/oc-kit
 
-Smart automation toolkit for package.json scripts and Docker operations in opencode. **USE THIS INSTEAD OF BASH** for package.json scripts and Docker operations.
+> **🚀 Smart automation toolkit for OpenCode agents**  
+> Beautiful, intelligent alternatives to bash commands with auto-detection, enhanced output, and zero configuration.
 
-## 🚀 Why Choose Kit Over Bash
+[![Tests](https://img.shields.io/badge/tests-126%20passing-brightgreen)](https://github.com/autotelic/oc-kit)
+[![TypeScript](https://img.shields.io/badge/typescript-100%25-blue)](https://www.typescriptlang.org/)
+[![Bun](https://img.shields.io/badge/runtime-bun-black)](https://bun.sh/)
 
-### ✅ Kit Advantages
-- **Smart Detection**: Auto-detects package managers (npm/yarn/pnpm/bun) and Docker setups
-- **Built-in Doppler**: Automatically wraps commands with `doppler run` when available
-- **Structured Output**: Clean exit codes, separated stdout/stderr, timeout protection
-- **Error Prevention**: Handles environment variables, workspace filtering, and complex arguments correctly
-- **Zero Configuration**: Works immediately in any project without setup
+## ✨ What Makes Kit Special
 
-### ❌ Bash Pain Points Kit Solves
-- Manual package manager detection and command construction
-- Missing Doppler integration leads to environment variable issues
-- Inconsistent error handling and output parsing
-- No timeout protection for long-running operations
-- Complex workspace filtering syntax errors
-
-## Installation
-
-Install the kit tools in your opencode project:
-
+**Before Kit** 😤
 ```bash
-# Install the package
-bun add @autotelic/oc-kit
+bash { command: "npm run test" }
+# Command: npm run test
+# Exit code: 0
+# 
+# Stdout:
+# 126 tests passed
+# 
+# Stderr:
+```
 
-# Copy tool files to your opencode configuration
+**After Kit** ✨
+```typescript
+kit { script: "test" }
+# ✅ test completed successfully (2.1s)
+# 🧪 126 tests passed
+# 
+# 📄 Output:
+# All test suites passed successfully
+```
+
+---
+
+## 🎯 **USE THIS INSTEAD OF BASH**
+
+Kit provides intelligent, context-aware automation for:
+- 📦 **Package.json scripts** (lint, test, build, dev)
+- 🐳 **Docker operations** (up/down, logs, build, exec) 
+- 🐙 **Docker Compose** (multi-service orchestration)
+- 🚀 **Development servers** (background process management)
+
+---
+
+## 🚀 Quick Start
+
+### Global Installation
+```bash
+npm install -g @autotelic/oc-kit
+mkdir -p ~/.opencode/tool
+cp "$(npm root -g)/@autotelic/oc-kit/tool/*" ~/.opencode/tool/
+```
+
+### Project Installation  
+```bash
+npm install @autotelic/oc-kit
+mkdir -p .opencode/tool
 cp node_modules/@autotelic/oc-kit/tool/* .opencode/tool/
 ```
 
-Or install globally:
+### Development Testing (Unpublished)
+```bash
+# In this repo
+npm link
+mkdir -p ~/.opencode/tool  
+cp tool/* ~/.opencode/tool/
+```
+
+---
+
+## 🛠️ **Core Tools**
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `kit` | **Package.json scripts** | `kit { script: "test" }` |
+| `kit_list` | **List available scripts** | `kit_list {}` |
+| `kit_docker` | **Container operations** | `kit_docker { action: "ps" }` |
+| `kit_compose` | **Docker Compose** | `kit_compose { action: "up" }` |
+| `kit_devStart` | **Background dev servers** | `kit_devStart { script: "api" }` |
+| `kit_devStatus` | **Monitor processes** | `kit_devStatus {}` |
+
+---
+
+## 💡 **Enhanced Output Examples**
+
+### ✅ **Successful Build**
+```typescript
+kit { script: "build" }
+# ✅ build completed successfully (15.2s)
+# 🏗️  Build artifacts generated
+# 
+# 📄 Output:
+# Bundled 23 modules in 142ms
+# dist/kit.js  89.2 KB
+```
+
+### ❌ **Failed Test with Smart Suggestions**
+```typescript  
+kit { script: "test" }
+# ❌ test failed (0.8s)
+# 
+# 🔧 Command: bun test src/
+# 📉 Exit code: 1
+# 
+# ❌ Error details:
+# Module not found: cannot resolve './missing-file'
+# 
+# 💡 Suggestions:
+# • Try running `npm install` to ensure dependencies are installed
+# • Check the file path and ensure the module exists
+```
+
+### 🐳 **Docker Operations**
+```typescript
+kit_docker { action: "logs", container: "api" }
+# ✅ logs completed successfully
+# 
+# 📄 Output:
+# Server listening on port 3000
+# Database connected successfully
+# Ready to accept connections
+```
+
+---
+
+## 🎨 **Smart Features**
+
+### 🧠 **Context-Aware Messaging**
+- 🧪 **Tests**: "142 tests passed", "Test suite completed"
+- 🏗️ **Builds**: "Build artifacts generated", "Bundle created"  
+- 🧹 **Linting**: "No issues found", "Code style verified"
+- 🔍 **Type checking**: "No type errors", "Types validated"
+- 🚀 **Dev servers**: "Server ready", "Listening on port 3000"
+
+### ⚡ **Auto-Detection**
+- **Package managers**: npm, yarn, pnpm, bun (based on lock files)
+- **Docker setup**: Compose files, containers, services
+- **Doppler config**: Automatic environment variable injection
+- **Monorepo structure**: Workspace filtering and targeting
+
+### 🎯 **Intelligent Error Handling** 
+- **Contextual suggestions** based on error patterns
+- **Dependency issues**: "Try running npm install"
+- **Permission problems**: "Check file permissions"  
+- **Port conflicts**: "Another process may be using this port"
+- **Memory issues**: "Try increasing Node.js memory limit"
+
+### 🕐 **Smart Timeouts**
+- **Quick operations**: 30 seconds (ps, status, logs)
+- **Build operations**: 5 minutes (build, pull, up)
+- **Custom timeouts**: Override when needed
+- **No hanging processes**: Automatic cleanup
+
+---
+
+## 📦 **Package Scripts Made Easy**
+
+Replace complex bash commands with simple, reliable automation:
+
+```typescript
+// ❌ Old way - error-prone and verbose
+bash { command: "NODE_OPTIONS='--max-old-space-size=4096' pnpm --filter @app/ui run build --mode production" }
+
+// ✅ New way - handles complexity automatically  
+kit { script: "build", cwd: "./packages/ui" }
+```
+
+### **Advanced Examples**
+```typescript
+// Monorepo workspace filtering
+kit { script: "test", args: ["--watch"], cwd: "./services/api" }
+
+// Skip Doppler if needed
+kit { script: "build", skipDoppler: true }
+
+// Custom package manager
+kit { script: "dev", packageManager: "bun" }
+```
+
+---
+
+## 🐳 **Docker & Compose Integration**
+
+### **Container Management**
+```typescript
+kit_docker { action: "ps" }        // List containers
+kit_docker { action: "logs", container: "api" }
+kit_docker { action: "exec", container: "db", args: ["psql", "-U", "user"] }
+```
+
+### **Compose Operations**  
+```typescript
+kit_compose { action: "up", profile: "database" }     // Start DB services only
+kit_compose { action: "logs", services: ["api", "worker"] }
+kit_compose { action: "down" }                       // Clean shutdown
+```
+
+### **Service Discovery**
+```typescript
+kit_dockerList {}
+# === Docker Capabilities ===
+# Docker Available: ✅
+# Compose Available: ✅
+# 
+# === Discovered Services ===
+# Database: postgres, redis  
+# API: api, worker
+# Frontend: web, admin
+```
+
+---
+
+## 🚀 **Background Development Servers**
+
+Manage multiple dev servers with SQLite-based process tracking:
+
+### **Start Services**
+```typescript
+kit_devStart { script: "api" }      // Backend server
+kit_devStart { script: "web" }      // Frontend  
+kit_devStart { script: "worker" }   // Background jobs
+
+// Start multiple at once
+kit_devStartAll { scripts: ["api", "worker", "web"] }
+```
+
+### **Monitor & Control**
+```typescript
+kit_devStatus {}                    // Show all running services
+kit_devStop { script: "api" }       // Stop specific service
+kit_devRestart { script: "web" }    // Restart service  
+kit_devStop {}                      // Stop all services
+```
+
+### **Advanced Process Analysis**
+```typescript
+// Custom SQL queries on process database
+kit_devQuery { 
+  query: "SELECT script, COUNT(*) FROM processes GROUP BY script" 
+}
+
+kit_devQuery { 
+  query: "SELECT * FROM processes WHERE start_time > ?", 
+  params: ["1726929000000"] 
+}
+```
+
+---
+
+## ⚡ **When to Use Kit vs Bash**
+
+### ✅ **Always Use Kit For**
+- Package.json scripts (test, build, lint, dev)
+- Docker operations (up, down, logs, exec) 
+- Docker Compose orchestration
+- Development server management
+- Monorepo workspace commands
+- Environment-dependent operations
+
+### ❌ **Use Bash For** 
+- Multi-step shell pipelines (`ls | grep | sort`)
+- File operations (`cp`, `mv`, `mkdir`)
+- Complex shell scripting
+- System administration tasks
+
+---
+
+## 🎯 **Why Kit > Bash**
+
+| Feature | Kit | Bash |
+|---------|-----|------|
+| **Package Manager Detection** | ✅ Automatic | ❌ Manual |
+| **Doppler Integration** | ✅ Built-in | ❌ Manual setup |
+| **Error Suggestions** | ✅ Context-aware | ❌ Raw output |
+| **Timeout Protection** | ✅ Smart defaults | ❌ Hangs forever |
+| **Output Formatting** | ✅ Beautiful, organized | ❌ Raw text |
+| **Workspace Filtering** | ✅ Automatic | ❌ Complex syntax |
+| **Process Management** | ✅ SQLite tracking | ❌ No tracking |
+| **Zero Configuration** | ✅ Works everywhere | ❌ Project setup |
+
+---
+
+## 🔧 **Development**
+
+This project dogfoods its own tools:
 
 ```bash
-# Install globally
-bun add -g @autotelic/oc-kit
+# Use kit instead of bash for everything!
+kit { script: "test" }       # Run tests
+kit { script: "typecheck" }  # Type checking  
+kit { script: "lint" }       # Linting
+kit { script: "build" }      # Build for distribution
 
-# Copy tool files to global opencode configuration
-mkdir -p ~/.config/opencode/tool
-cp $(bun pm ls -g @autotelic/oc-kit)/tool/* ~/.config/opencode/tool/
+# Background development
+kit_devStart { script: "dev" }    # Start dev server
+kit_devStatus {}                  # Monitor processes
 ```
 
-## 🛠️ Available Tools
+### **Architecture**
+- **Runtime**: Bun-native APIs throughout
+- **Process Management**: SQLite in-memory database + JavaScript Map
+- **Security**: Comprehensive validation and guardrails
+- **Testing**: 126 tests with full coverage
+- **Distribution**: Dual-path for production and development
 
-- `kit` - **Primary tool**: Run package.json scripts with smart automation
-- `kit_list` - List all available scripts in current project
-- `kit_docker_list` - Show Docker capabilities (always available)
-- `kit_docker` - Container operations (requires Docker)
-- `kit_compose` - Docker Compose operations (requires compose files)
+---
 
-## 📦 Package.json Script Runner
+## 📄 **License**
 
-**Primary use case**: Replace `bash` commands with reliable, automated execution.
+MIT © [Autotelic](https://autotelic.co)
 
-```typescript
-// Instead of: bash { command: "pnpm run lint" }
-kit { script: "lint" }
+---
 
-// Instead of: bash { command: "pnpm --filter ui test --watch" }
-kit { script: "test", args: ["--watch"], cwd: "./services/ui" }
+<div align="center">
 
-// Instead of: bash { command: "NODE_ENV=test npm run build" }
-kit { script: "build" }  // Handles complex NODE_OPTIONS automatically
-```
+**Made with ❤️ for the OpenCode community**
 
-### Key Features
-- **Auto-detection**: Finds correct package manager based on lock files
-- **Workspace Support**: Handles monorepo filtering and directory targeting
-- **Environment Handling**: Processes complex environment variables correctly
-- **Timeout Protection**: Prevents hanging on long builds or tests
-- **Detailed Output**: Returns command, exit code, stdout, and stderr separately
+[Documentation](https://opencode.ai/docs/custom-tools) • [Issues](https://github.com/autotelic/oc-kit/issues) • [Contributing](CONTRIBUTING.md)
 
-## 🐳 Docker Integration
-
-Replaces complex docker and docker-compose commands with simple, consistent syntax.
-
-```typescript
-// Instead of: bash { command: "docker-compose up -d postgres redis" }
-kit_compose { action: "up", profile: "database" }
-
-// Instead of: bash { command: "docker logs --tail 100 myapp" }
-kit_docker { action: "logs", container: "myapp" }
-```
-
-### Smart Features
-- **Service Discovery**: Automatically finds and categorizes services
-- **Profile Generation**: Creates database, cache, dev, test profiles
-- **Compose File Detection**: Works with any compose file structure
-- **Intelligent Timeouts**: 30s for quick ops, 5min for builds
-
-## 💡 Usage Examples
-
-### Essential Package Scripts
-```typescript
-kit { script: "lint" }           // Auto-detects pnpm, adds Doppler
-kit { script: "test:rest" }      // Handles workspace filtering
-kit { script: "build" }          // Manages complex NODE_OPTIONS
-kit { script: "dev" }            // Perfect for development workflows
-```
-
-### Docker Operations Made Simple
-```typescript
-kit_docker_list {}                                    // See what's available
-kit_compose { action: "up", profile: "database" }     // Start only DB services
-kit_compose { action: "logs", services: ["postgres"] } // Targeted logging
-kit_docker { action: "ps" }                          // Container status
-```
-
-### Advanced Scenarios
-```typescript
-kit { script: "test", args: ["--watch"], cwd: "./services/ui" }
-kit_compose { action: "up", detach: true, timeout: 300000 }
-kit { script: "build", skipDoppler: true }  // Skip env vars if needed
-```
-
-## ⚡ When to Use Kit (Almost Always!)
-
-### ✅ Perfect For
-- **All package.json scripts** - lint, test, build, dev, etc.
-- **Docker operations** - up/down, logs, build, exec
-- **Monorepo commands** - workspace filtering and directory targeting
-- **Development workflows** - consistent automation across projects
-- **CI/CD integration** - reliable exit codes and structured output
-
-### ❌ Use Bash Instead For
-- Multi-step operations requiring pipes or complex logic
-- Custom shell commands not related to package.json or Docker
-- File operations (cp, mv, mkdir) - use dedicated tools
-- Environment variable manipulation or complex scripting
-
-## 🎯 Smart Automation Features
-
-- **Doppler Integration**: Auto-wraps with `doppler run --` when config detected
-- **Package Manager Detection**: Chooses npm/yarn/pnpm/bun based on lock files  
-- **Workspace Awareness**: Handles monorepo filtering automatically
-- **Timeout Management**: Prevents hanging operations with smart defaults
-- **Error Handling**: Structured output with exit codes and detailed feedback
-- **Zero Setup**: Works immediately in any JavaScript/TypeScript project
-
-## Development
-
-```bash
-# Install dependencies
-bun install
-
-# Type check
-bun run typecheck
-
-# Build for distribution
-bun run build
-
-# Test locally
-bun test
-```
-
-## License
-
-MIT © Autotelic
+</div>

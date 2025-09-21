@@ -8,6 +8,8 @@ import type { Subprocess } from 'bun'
 import type { ToolArgs, OpenCodeContext } from '../types.js'
 import { getPackageJson, getScripts, detectPackageManager } from '../core/package-manager.js'
 import { wrapWithDoppler } from '../core/doppler.js'
+import { getOpenCodeTool } from '../core/plugin-compat.js'
+import { resolveWorkingDirectory } from '../utils/common.js'
 
 // In-memory SQLite database (session-scoped, no disk persistence)
 const db = new Database(":memory:")
@@ -245,7 +247,7 @@ function unregisterProcess(script: string, cwd: string): void {
  */
 async function executeDevStart(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   // Use context working directory, then args.cwd, then fallback to process.cwd()
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
 
   try {
     // Clean up any dead processes first
@@ -375,7 +377,7 @@ The development server will continue running while you work. It will automatical
  * Check status of background development servers
  */
 async function executeDevStatus(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
   
   try {
     cleanupRegistry()
@@ -412,7 +414,7 @@ async function executeDevStatus(args: ToolArgs, context: OpenCodeContext): Promi
  * Stop background development servers
  */
 async function executeDevStop(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
   
   try {
     cleanupRegistry()
@@ -503,7 +505,7 @@ async function executeDevStop(args: ToolArgs, context: OpenCodeContext): Promise
  * Restart background development servers
  */
 async function executeDevRestart(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
   
   try {
     cleanupRegistry()
@@ -573,7 +575,7 @@ async function executeDevRestart(args: ToolArgs, context: OpenCodeContext): Prom
  * Start multiple development services at once
  */
 async function executeDevStartAll(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
   
   try {
     // Get list of scripts to start
@@ -652,31 +654,7 @@ async function executeDevStartAll(args: ToolArgs, context: OpenCodeContext): Pro
 }
 
 // OpenCode plugin compatibility layer
-const toolModule = await import('@opencode-ai/plugin').catch(() => {
-  const mockDescribe = { 
-    describe: (_d: string) => mockDescribe,
-    optional: () => mockDescribe,
-    _zod: true as any
-  }
-  const mockOptional = { 
-    describe: (_d: string) => mockOptional,
-    optional: () => mockDescribe,
-    _zod: true as any
-  }
-  
-  return {
-    tool: Object.assign((config: any) => config, {
-      schema: {
-        string: () => mockDescribe,
-        array: () => mockOptional,
-        enum: () => mockOptional,
-        boolean: () => mockOptional,
-        number: () => mockOptional
-      }
-    })
-  }
-})
-const { tool } = toolModule
+const tool = await getOpenCodeTool()
 
 /**
  * Custom opencode tool for starting a development server in the background using OpenCode's Task system.

@@ -10,33 +10,11 @@ import { executeCommand, formatCommandResult } from '../core/execution.js'
 import { validateScriptName, validateArgumentArray } from '../core/security-validation.js'
 import { checkScriptGuardrails, DEFAULT_SECURITY_CONFIG } from '../core/security-guardrails.js'
 import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from '../core/streaming.js'
+import { getOpenCodeTool } from '../core/plugin-compat.js'
+import { resolveWorkingDirectory } from '../utils/common.js'
 
 // OpenCode plugin compatibility layer
-const toolModule = await import('@opencode-ai/plugin').catch(() => {
-  const mockDescribe = { 
-    describe: (_d: string) => mockDescribe,
-    optional: () => mockDescribe,
-    _zod: true as any
-  }
-  const mockOptional = { 
-    describe: (_d: string) => mockOptional,
-    optional: () => mockDescribe,
-    _zod: true as any
-  }
-  
-  return {
-    tool: Object.assign((config: any) => config, {
-      schema: {
-        string: () => mockDescribe,
-        array: () => mockOptional,
-        enum: () => mockOptional,
-        boolean: () => mockOptional,
-        number: () => mockOptional
-      }
-    })
-  }
-})
-const { tool } = toolModule
+const tool = await getOpenCodeTool()
 
 // Load tool description
 // eslint-disable-next-line no-undef
@@ -50,7 +28,7 @@ const DESCRIPTION = await Bun.file(`${import.meta.dir}/../../tool/kit.txt`).text
  */
 export async function executePackageScript(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   // Use context working directory, then args.cwd, then fallback to process.cwd()
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
 
   try {
     if (!args.script) {
@@ -135,7 +113,7 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
  */
 export async function listPackageScripts(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   // Use context working directory, then args.cwd, then fallback to process.cwd()
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
 
   try {
     const packageJson = await getPackageJson(workingDir)

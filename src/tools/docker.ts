@@ -28,6 +28,8 @@ import {
   DEFAULT_SECURITY_CONFIG
 } from '../core/security-guardrails.js'
 import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from '../core/streaming.js'
+import { getOpenCodeTool } from '../core/plugin-compat.js'
+import { resolveWorkingDirectory } from '../utils/common.js'
 
 /**
  * Builds a Docker command based on the provided arguments
@@ -161,7 +163,7 @@ function buildDockerCommand(args: ToolArgs): string[] | string {
  * @returns Promise resolving to formatted command result
  */
 export async function executeDockerCommand(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
   const capabilities = await getDockerCapabilities(workingDir)
 
   // Validate Docker availability
@@ -219,7 +221,7 @@ export async function executeDockerCommand(args: ToolArgs, context: OpenCodeCont
  * @returns Promise resolving to formatted Docker capabilities report
  */
 export async function listDockerCapabilities(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = args.cwd || context.cwd || process.cwd()
+  const workingDir = resolveWorkingDirectory(args, context)
   const capabilities = await getDockerCapabilities(workingDir)
 
   const output: string[] = []
@@ -296,31 +298,7 @@ export async function listDockerCapabilities(args: ToolArgs, context: OpenCodeCo
 }
 
 // OpenCode plugin compatibility layer
-const toolModule = await import('@opencode-ai/plugin').catch(() => {
-  const mockDescribe = { 
-    describe: (_d: string) => mockDescribe,
-    optional: () => mockDescribe,
-    _zod: true as any
-  }
-  const mockOptional = { 
-    describe: (_d: string) => mockOptional,
-    optional: () => mockDescribe,
-    _zod: true as any
-  }
-  
-  return {
-    tool: Object.assign((config: any) => config, {
-      schema: {
-        string: () => mockDescribe,
-        array: () => mockOptional,
-        enum: () => mockOptional,
-        boolean: () => mockOptional,
-        number: () => mockOptional
-      }
-    })
-  }
-})
-const { tool } = toolModule
+const tool = await getOpenCodeTool()
 
 /**
  * Custom opencode tool for executing Docker container operations.

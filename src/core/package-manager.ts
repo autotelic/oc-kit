@@ -2,6 +2,8 @@
  * Package manager detection and utilities
  */
 
+import { readdir } from 'node:fs/promises'
+
 /**
  * Supported package managers for JavaScript/TypeScript projects
  */
@@ -84,4 +86,88 @@ export function buildPackageCommand(
   }
   
   return baseCommand
+}
+
+/**
+ * Represents a discovered workspace with its package.json information
+ */
+export interface WorkspaceInfo {
+  /** Absolute path to the workspace directory */
+  path: string
+  /** Relative path from the root directory */
+  relativePath: string
+  /** Parsed package.json content */
+  packageJson: Record<string, unknown>
+  /** Scripts available in this workspace */
+  scripts: Record<string, string>
+  /** Package name from package.json (if available) */
+  name?: string | undefined
+}
+
+/**
+ * Recursively discovers all package.json files in a directory tree, excluding node_modules
+ * @param rootDir - Root directory to start searching from
+ * @returns Array of WorkspaceInfo objects for each discovered workspace
+ */
+export async function discoverWorkspaces(rootDir: string): Promise<WorkspaceInfo[]> {
+  const workspaces: WorkspaceInfo[] = []
+  
+  async function searchDirectory(currentDir: string) {
+    try {
+      // Use readdir to get all directory contents including directories
+      const entries = await readdir(currentDir, { withFileTypes: true })
+      
+      let hasPackageJson = false
+      const subdirectories: string[] = []
+      
+      for (const entry of entries) {
+        if (entry.name === 'package.json' && entry.isFile()) {
+          hasPackageJson = true
+        } else if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+          subdirectories.push(`${currentDir}/${entry.name}`)
+        }
+      }
+      
+      // If this directory has a package.json, add it as a workspace
+      if (hasPackageJson) {
+        try {
+          const packageJson = await getPackageJson(currentDir)
+          const scripts = getScripts(packageJson)
+          const relativePath = currentDir === rootDir ? '.' : currentDir.replace(rootDir + '/', '')
+          
+          workspaces.push({
+            path: currentDir,
+            relativePath,
+            packageJson,
+            scripts,
+            name: packageJson.name as string | undefined
+          })
+        } catch (error) {
+          // Skip invalid package.json files
+          console.warn(`Warning: Could not parse package.json in ${currentDir}:`, error)
+        }
+      }
+      
+      // Recursively search subdirectories
+      for (const subdir of subdirectories) {
+        await searchDirectory(subdir)
+      }
+    } catch (error) {
+      // Skip directories we can't read
+      console.warn(`Warning: Could not read directory ${currentDir}:`, error)
+    }
+  }
+  
+  await searchDirectory(rootDir)
+  return workspaces
+}
+
+/**
+ * Finds a workspace that contains the specified script
+ * @param workspaces - Array of discovered workspaces
+ * @param scriptName - Name of the script to find
+ * @returns WorkspaceInfo containing the script, or undefined if not found
+ */
+export function findWorkspaceWithScript(workspaces: WorkspaceInfo[], scriptName: string): WorkspaceInfo | undefined {
+  return workspaces.find(workspace => workspace.scripts[scriptName])
 }

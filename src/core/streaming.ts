@@ -261,3 +261,25 @@ export function shouldUseStreaming(command: string, args: string[] = []): boolea
 
   return false
 }
+
+/**
+ * Determines if a script is likely a dev server that should run indefinitely
+ * @param command - The command being executed
+ * @param args - Command arguments
+ * @returns Whether this is likely a dev server script
+ */
+export function isDevServerScript(command: string, args: string[] = []): boolean {
+  const devServerCommands = ['npm', 'yarn', 'pnpm', 'bun']
+  const devServerScripts = ['dev', 'start', 'serve', 'server']
+  
+  // Check if it's a package manager running a dev-like script
+  if (devServerCommands.includes(command)) {
+    for (const arg of args) {
+      if (devServerScripts.some(script => arg === script || arg.includes(script))) {
+        return true
+      }
+    }
+  }
+  
+  return false
+}

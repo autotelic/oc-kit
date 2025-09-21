@@ -32,6 +32,8 @@ export interface ToolArgs {
   packageManager?: 'npm' | 'yarn' | 'pnpm' | 'bun'
   /** Skip automatic Doppler environment variable wrapping */
   skipDoppler?: boolean
+  /** Specific workspace path/name to target for monorepo operations */
+  workspace?: string
   /** Docker/Compose action to perform */
   action?: string
   /** Docker image name for build/run/pull/push operations */

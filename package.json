@@ -38,8 +38,8 @@
     "lint": "bun run typecheck",
     "test": "bun test src/",
     "dev": "bun run build --watch",
-    "test-server": "bun run examples/test-server.ts",
-    "test-server-2": "bun run examples/test-server-2.ts",
+    "test-server": "bun run examples/test-server-1/test-server.ts",
+    "test-server-2": "bun run examples/test-server-2-app/test-server-2.ts",
     "clean": "rm -rf dist",
     "install-tools": "mkdir -p .opencode/tool && cp tool/* .opencode/tool/",
     "prepare": "bun run build"

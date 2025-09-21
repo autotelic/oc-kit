@@ -1,0 +1,12 @@
+{
+  "name": "@examples/test-server-1",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run test-server.ts",
+    "start": "bun run test-server.ts"
+  },
+  "dependencies": {
+    "bun": "latest"
+  }
+}

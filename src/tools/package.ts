@@ -4,12 +4,12 @@
  */
 
 import type { ToolArgs, OpenCodeContext } from '../types.js'
-import { detectPackageManager, getPackageJson, getScripts, buildPackageCommand } from '../core/package-manager.js'
+import { detectPackageManager, getPackageJson, getScripts, buildPackageCommand, discoverWorkspaces, findWorkspaceWithScript, type WorkspaceInfo } from '../core/package-manager.js'
 import { wrapWithDoppler } from '../core/doppler.js'
 import { executeCommand, formatCommandResult } from '../core/execution.js'
 import { validateScriptName, validateArgumentArray } from '../core/security-validation.js'
 import { checkScriptGuardrails, DEFAULT_SECURITY_CONFIG } from '../core/security-guardrails.js'
-import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from '../core/streaming.js'
+import { executeWithStreaming, shouldUseStreaming, isDevServerScript, createProgressLogger, createOutputStreamers } from '../core/streaming.js'
 import { getOpenCodeTool } from '../core/plugin-compat.js'
 import { resolveWorkingDirectory } from '../utils/common.js'
 
@@ -35,7 +35,8 @@ function streamingToCommandResult(streamingResult: any): any {
 }
 
 /**
- * Executes a package.json script with package manager auto-detection and Doppler integration
+ * Executes a package.json script with package manager auto-detection and Doppler integration.
+ * Supports monorepo workspaces by automatically finding the workspace containing the script.
  * @param args - Tool arguments containing script name and parameters
  * @param context - OpenCode context containing session information
  * @returns Promise resolving to formatted command result
@@ -72,17 +73,76 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
       }
     }
 
-    const packageJson = await getPackageJson(workingDir)
-    const scripts = getScripts(packageJson)
+    // Discover all workspaces and find the one containing the script
+    const workspaces = await discoverWorkspaces(workingDir)
+    let targetWorkspace: WorkspaceInfo | undefined
+    let executionDir = workingDir
 
-    if (!scripts[args.script]) {
-      const availableScripts = Object.keys(scripts)
-      return `Script "${args.script}" not found. Available scripts: ${availableScripts.join(', ')}`
+    // If workspace is specified, try to find it first
+    if (args.workspace) {
+      const specifiedWorkspace = workspaces.find(ws => 
+        ws.relativePath === args.workspace || 
+        ws.path === args.workspace ||
+        ws.name === args.workspace
+      )
+      
+      if (specifiedWorkspace) {
+        if (specifiedWorkspace.scripts[args.script]) {
+          targetWorkspace = specifiedWorkspace
+          executionDir = targetWorkspace.path
+        } else {
+          return `Script "${args.script}" not found in specified workspace "${args.workspace}". Available scripts in that workspace: ${Object.keys(specifiedWorkspace.scripts).join(', ')}`
+        }
+      } else {
+        return `Workspace "${args.workspace}" not found. Available workspaces: ${workspaces.map(ws => ws.name || ws.relativePath).join(', ')}`
+      }
+    } else {
+      // Auto-discovery mode
+      // First, try to find the script in the current directory
+      try {
+        const packageJson = await getPackageJson(workingDir)
+        const scripts = getScripts(packageJson)
+        
+        if (scripts[args.script]) {
+          // Script found in current directory, use it
+          targetWorkspace = {
+            path: workingDir,
+            relativePath: '.',
+            packageJson,
+            scripts,
+            name: packageJson.name as string | undefined
+          }
+        }
+      } catch {
+        // Current directory doesn't have a package.json, continue with workspace search
+      }
+
+      // If not found in current directory, search all workspaces
+      if (!targetWorkspace) {
+        targetWorkspace = findWorkspaceWithScript(workspaces, args.script)
+        
+        if (targetWorkspace) {
+          executionDir = targetWorkspace.path
+        }
+      }
     }
 
-    const packageManager = args.packageManager || await detectPackageManager(workingDir)
+    if (!targetWorkspace) {
+      // Collect all available scripts from all workspaces for better error message
+      const allScripts = new Set<string>()
+      for (const workspace of workspaces) {
+        Object.keys(workspace.scripts).forEach(script => allScripts.add(script))
+      }
+      
+      const availableScripts = Array.from(allScripts).sort()
+      return `Script "${args.script}" not found in any workspace. Available scripts: ${availableScripts.join(', ')}`
+    }
+
+
+
+    const packageManager = args.packageManager || await detectPackageManager(executionDir)
     const baseCommand = buildPackageCommand(packageManager, args.script, args.args)
-    const finalCommand = await wrapWithDoppler(baseCommand, workingDir, args.skipDoppler, args.script)
+    const finalCommand = await wrapWithDoppler(baseCommand, executionDir, args.skipDoppler, args.script)
 
     // Check if this command should use streaming for real-time output
     const [command, ...commandArgs] = finalCommand
@@ -91,6 +151,20 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
     }
     
     const useStreaming = shouldUseStreaming(command, commandArgs)
+    const isDevServer = isDevServerScript(command, commandArgs)
+
+    // For dev servers, suggest using kit_devStart instead
+    if (isDevServer) {
+      const workspaceParam = targetWorkspace.relativePath !== '.' 
+        ? `, workspace: "${targetWorkspace.name || targetWorkspace.relativePath}"` 
+        : ''
+      
+      return `💡 Dev server detected! For long-running dev servers, use kit_devStart instead:
+
+  kit_devStart { script: "${args.script}"${workspaceParam} }
+
+This runs the server in the background without blocking your session. Use kit_devStatus to monitor it.`
+    }
 
     if (useStreaming) {
       // Use streaming execution for long-running commands
@@ -98,7 +172,7 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
       const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
 
       const result = await executeWithStreaming(command, commandArgs, {
-        cwd: workingDir,
+        cwd: executionDir,
         timeout: 300000, // 5 minutes for package operations
         onProgress: progressLogger,
         onStdout,
@@ -107,14 +181,20 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
 
       // Convert streaming result to CommandResult format and use enhanced formatting
       const commandResult = streamingToCommandResult(result)
-      return formatCommandResult(commandResult, args.script)
+      const workspaceNote = targetWorkspace.relativePath !== '.' 
+        ? ` (workspace: ${targetWorkspace.name || targetWorkspace.relativePath})`
+        : ''
+      return formatCommandResult(commandResult, `${args.script}${workspaceNote}`)
     } else {
       // Use regular execution for quick commands
       const result = await executeCommand(finalCommand, {
-        cwd: workingDir
+        cwd: executionDir
       })
 
-      return formatCommandResult(result, args.script)
+      const workspaceNote = targetWorkspace.relativePath !== '.' 
+        ? ` (workspace: ${targetWorkspace.name || targetWorkspace.relativePath})`
+        : ''
+      return formatCommandResult(result, `${args.script}${workspaceNote}`)
     }
   } catch (error) {
     return `Error: ${(error as Error).message}`
@@ -122,28 +202,55 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
 }
 
 /**
- * Lists all available package.json scripts in the current project
+ * Lists all available package.json scripts in the current project and all workspaces
  * @param args - Tool arguments containing optional working directory
  * @param context - OpenCode context containing session information
- * @returns Promise resolving to formatted list of available scripts
+ * @returns Promise resolving to formatted list of available scripts from all workspaces
  */
 export async function listPackageScripts(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   // Use context working directory, then args.cwd, then fallback to process.cwd()
   const workingDir = resolveWorkingDirectory(args, context)
 
   try {
-    const packageJson = await getPackageJson(workingDir)
-    const scripts = getScripts(packageJson)
+    // Discover all workspaces in the project
+    const workspaces = await discoverWorkspaces(workingDir)
     
-    const packagePath = Bun.resolveSync('./package.json', workingDir)
+    if (workspaces.length === 0) {
+      return 'No package.json files found in the project'
+    }
 
-    const scriptList = Object.entries(scripts)
-      .map(([name, command]) => `  ${name}: ${command}`)
-      .join('\n')
+    // Sort workspaces by relative path for consistent output
+    workspaces.sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 
-    return `Available scripts in ${packagePath}:\n${scriptList}`
+    const output: string[] = []
+    
+    for (const workspace of workspaces) {
+      const scriptEntries = Object.entries(workspace.scripts)
+      
+      if (scriptEntries.length === 0) {
+        continue // Skip workspaces with no scripts
+      }
+
+      const workspaceHeader = workspace.name 
+        ? `${workspace.name} (${workspace.relativePath})`
+        : workspace.relativePath
+
+      output.push(`\n📦 ${workspaceHeader}:`)
+      
+      const scriptList = scriptEntries
+        .map(([name, command]) => `  ${name}: ${command}`)
+        .join('\n')
+      
+      output.push(scriptList)
+    }
+
+    if (output.length === 0) {
+      return 'No scripts found in any workspace'
+    }
+
+    return `Available scripts across all workspaces:${output.join('\n')}`
   } catch (error) {
-    return `Error reading package.json: ${(error as Error).message}`
+    return `Error discovering workspaces: ${(error as Error).message}`
   }
 }
 
@@ -164,7 +271,8 @@ export const run = tool({
     args: tool.schema.array(tool.schema.string()).optional().describe('Additional arguments to pass to the script'),
     cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)'),
     packageManager: tool.schema.enum(['npm', 'yarn', 'pnpm', 'bun']).optional().describe('Package manager to use (auto-detected if not specified)'),
-    skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)')
+    skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)'),
+    workspace: tool.schema.string().optional().describe('Specific workspace path to run the script in (auto-detected if not specified)')
   },
   async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
     return executePackageScript(args, context)

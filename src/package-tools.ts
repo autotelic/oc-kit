@@ -8,6 +8,7 @@ import { wrapWithDoppler } from './doppler.js'
 import { executeCommand, formatCommandResult } from './execution.js'
 import { validateScriptName, validateArgumentArray } from './security-validation.js'
 import { checkScriptGuardrails, DEFAULT_SECURITY_CONFIG } from './security-guardrails.js'
+import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from './streaming.js'
 
 /**
  * Executes a package.json script with package manager auto-detection and Doppler integration
@@ -59,11 +60,36 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
     const baseCommand = buildPackageCommand(packageManager, args.script, args.args)
     const finalCommand = await wrapWithDoppler(baseCommand, workingDir, args.skipDoppler, args.script)
 
-    const result = await executeCommand(finalCommand, {
-      cwd: workingDir
-    })
+    // Check if this command should use streaming for real-time output
+    const [command, ...commandArgs] = finalCommand
+    if (!command) {
+      return 'Error: Invalid command structure'
+    }
+    
+    const useStreaming = shouldUseStreaming(command, commandArgs)
 
-    return formatCommandResult(result)
+    if (useStreaming) {
+      // Use streaming execution for long-running commands
+      const progressLogger = createProgressLogger('📦')
+      const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
+
+      const result = await executeWithStreaming(command, commandArgs, {
+        cwd: workingDir,
+        timeout: 300000, // 5 minutes for package operations
+        onProgress: progressLogger,
+        onStdout,
+        onStderr
+      })
+
+      return `Command: ${result.command}\nExit code: ${result.exitCode}\n\nFinal stdout:\n${result.stdout}\n\nFinal stderr:\n${result.stderr}`
+    } else {
+      // Use regular execution for quick commands
+      const result = await executeCommand(finalCommand, {
+        cwd: workingDir
+      })
+
+      return formatCommandResult(result)
+    }
   } catch (error) {
     return `Error: ${(error as Error).message}`
   }

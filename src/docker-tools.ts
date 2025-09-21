@@ -26,6 +26,7 @@ import {
   checkDockerNetworkSettings,
   DEFAULT_SECURITY_CONFIG
 } from './security-guardrails.js'
+import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from './streaming.js'
 
 /**
  * Builds a Docker command based on the provided arguments
@@ -176,10 +177,36 @@ export async function executeDockerCommand(args: ToolArgs, context: OpenCodeCont
   const finalCommand = await wrapWithDoppler(commandOrError, workingDir, args.skipDoppler, args.action)
   const timeout = getDockerTimeout(args.action || '', args.timeout)
 
-  const result = await executeCommand(finalCommand, {
-    cwd: workingDir,
-    timeout
-  })
+  // Check if this Docker command should use streaming
+  const [command, ...commandArgs] = finalCommand
+  if (!command) {
+    return 'Error: Invalid command structure'
+  }
 
-  return formatCommandResult(result)
+  const useStreaming = shouldUseStreaming(command, commandArgs) || 
+    ['build', 'pull', 'logs', 'run'].includes(args.action || '')
+
+  if (useStreaming) {
+    // Use streaming execution for long-running Docker commands
+    const progressLogger = createProgressLogger('🐳')
+    const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
+
+    const result = await executeWithStreaming(command, commandArgs, {
+      cwd: workingDir,
+      timeout,
+      onProgress: progressLogger,
+      onStdout,
+      onStderr
+    })
+
+    return `Command: ${result.command}\nExit code: ${result.exitCode}\n\nFinal stdout:\n${result.stdout}\n\nFinal stderr:\n${result.stderr}`
+  } else {
+    // Use regular execution for quick commands
+    const result = await executeCommand(finalCommand, {
+      cwd: workingDir,
+      timeout
+    })
+
+    return formatCommandResult(result)
+  }
 }

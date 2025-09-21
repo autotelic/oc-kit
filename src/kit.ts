@@ -17,6 +17,7 @@ import { executePackageScript, listPackageScripts } from './package-tools.js'
 import { executeDockerCommand } from './docker-tools.js'
 import { executeComposeCommand } from './compose-tools.js'
 import { listDockerCapabilities } from './docker-list.js'
+import { executeDevStart, executeDevStatus, executeDevStop, executeDevRestart } from './dev-tools.js'
 
 // OpenCode plugin compatibility layer
 const toolModule = await import('@opencode-ai/plugin').catch(() => {
@@ -149,5 +150,72 @@ export const dockerList = tool({
   },
   async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
     return listDockerCapabilities(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for starting a development server in the background using OpenCode's Task system.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devStart = tool({
+  description: 'Start development server in background sub-session. Auto-detects dev script (dev, start, serve) and monitors without blocking conversation.',
+  args: {
+    script: tool.schema.string().optional().describe('Development script name (auto-detects from dev, start, serve if not specified)'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevStart(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for checking status of background development servers.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devStatus = tool({
+  description: 'Check status of background development servers running in current session.',
+  args: {
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevStatus(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for stopping background development servers.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devStop = tool({
+  description: 'Stop background development servers. Can stop specific script or all servers.',
+  args: {
+    script: tool.schema.string().optional().describe('Specific script to stop (stops all if not specified)'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevStop(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for restarting background development servers.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devRestart = tool({
+  description: 'Restart background development servers. Can restart specific script or all servers.',
+  args: {
+    script: tool.schema.string().optional().describe('Specific script to restart (restarts all if not specified)'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevRestart(args, context)
   }
 })

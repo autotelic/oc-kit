@@ -1,0 +1,18 @@
+{
+  "processes": {
+    "test-server-/Users/togmund/autotelic/oc-kit": {
+      "pid": 13156,
+      "script": "test-server",
+      "cwd": "/Users/togmund/autotelic/oc-kit",
+      "startTime": 1758416513049,
+      "command": [
+        "doppler",
+        "run",
+        "--",
+        "bun",
+        "run",
+        "test-server"
+      ]
+    }
+  }
+}

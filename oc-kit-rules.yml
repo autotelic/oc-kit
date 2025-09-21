@@ -352,6 +352,7 @@ rules:
       pattern: import { $$$IMPORTS } from 'bun:test'
     note: "Using Bun's native test framework consistently"
 
+
   - id: relative-import-js-extension
     message: "Relative import with .js extension"
     severity: info
@@ -359,3 +360,157 @@ rules:
     rule:
       pattern: import { $$$IMPORTS } from './$MODULE.js'
     note: "Good practice: explicit .js extensions for ES modules"
+
+  # === MONOREPO PATTERNS ===
+
+  - id: workspace-discovery-usage
+    message: "Workspace discovery function usage"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: discoverWorkspaces($DIR)
+        - pattern: findWorkspaceWithScript($WORKSPACES, $SCRIPT)
+    note: "Good practice: using workspace discovery for monorepo support"
+
+  - id: workspace-info-interface
+    message: "WorkspaceInfo interface usage"
+    severity: info
+    language: typescript
+    rule:
+      pattern: ": WorkspaceInfo"
+    note: "Type safety: using WorkspaceInfo interface for workspace data"
+
+  - id: workspace-parameter-support
+    message: "Workspace parameter in tool args"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        workspace?: string
+    inside:
+      pattern: |
+        args: {
+          $$$
+        }
+    note: "Good practice: supporting workspace parameter for monorepo targeting"
+
+  - id: workspace-relative-path-usage
+    message: "Workspace relative path handling"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: targetWorkspace.relativePath
+        - pattern: workspace.relativePath
+        - pattern: $WORKSPACE.relativePath
+    note: "Good practice: using relative paths for workspace identification"
+
+  - id: workspace-name-fallback
+    message: "Workspace name with fallback pattern"
+    severity: info
+    language: typescript
+    rule:
+      pattern: $WORKSPACE.name || $WORKSPACE.relativePath
+    note: "Good practice: providing fallback when workspace name unavailable"
+
+  - id: execution-directory-workspace
+    message: "Execution directory set from workspace"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        executionDir = $WORKSPACE.path
+    note: "Good practice: setting execution directory from workspace path"
+
+  - id: workspace-script-not-found
+    message: "Workspace-aware script not found error"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        Script "$SCRIPT" not found in any workspace
+    note: "Good UX: workspace-aware error messages for script discovery"
+
+  # === DEV SERVER PATTERNS ===
+
+  - id: dev-server-detection
+    message: "Dev server script detection"
+    severity: info
+    language: typescript
+    rule:
+      pattern: isDevServerScript($CMD, $ARGS)
+    note: "Good practice: detecting dev server scripts for appropriate handling"
+
+  - id: dev-server-recommendation
+    message: "Dev server tool recommendation"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        kit_devStart { script: "$SCRIPT"
+    note: "Good UX: recommending appropriate tools for dev servers"
+
+  - id: background-process-management
+    message: "Background process management usage"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: kit_devStart
+        - pattern: kit_devStatus
+        - pattern: kit_devStop
+        - pattern: kit_devRestart
+    note: "Good practice: using background process management for dev servers"
+
+  - id: dev-script-timeout-handling
+    message: "Dev script timeout consideration"
+    severity: warning
+    language: typescript
+    rule:
+      pattern: |
+        timeout: $TIME
+    inside:
+      pattern: |
+        executeWithStreaming($CMD, $ARGS, {
+          $$$
+        })
+    constraints:
+      TIME:
+        regex: "^[0-9]000$"
+    note: "Consider longer timeouts for dev servers or recommend kit_devStart"
+
+  # === RECURSIVE DISCOVERY PATTERNS ===
+
+  - id: recursive-directory-search
+    message: "Recursive directory search implementation"
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        async function searchDirectory($DIR) {
+          $$$
+          for (const $SUBDIR of $SUBDIRS) {
+            await searchDirectory($SUBDIR)
+          }
+          $$$
+        }
+    note: "Good practice: recursive directory traversal for workspace discovery"
+
+  - id: node-modules-exclusion
+    message: "Node modules directory exclusion"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: $ENTRY.name !== 'node_modules'
+        - pattern: $FILENAME !== 'node_modules'
+    note: "Good practice: excluding node_modules from recursive searches"
+
+  - id: hidden-directory-exclusion
+    message: "Hidden directory exclusion"
+    severity: info
+    language: typescript
+    rule:
+      pattern: $NAME.startsWith('.')
+    note: "Pattern detected: hidden directory check (should be excluded)"

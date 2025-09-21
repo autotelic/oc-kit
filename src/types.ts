@@ -50,6 +50,10 @@ export interface ToolArgs {
   file?: string
   /** Run Docker Compose operations in detached mode */
   detach?: boolean
+  /** SQL query string for dev query operations */
+  query?: string
+  /** Parameters for SQL query operations */
+  params?: any[]
 }
 
 /**

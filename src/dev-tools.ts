@@ -57,6 +57,105 @@ const deleteProcess = db.prepare(`
 const processObjects = new Map<string, Subprocess>()
 
 /**
+ * Execute a custom SQL query on the process database
+ * Supports both SELECT queries and data modification queries
+ * @param query - SQL query string
+ * @param params - Optional parameters for the query
+ * @returns Query results or execution info
+ */
+export function executeProcessQuery(query: string, ...params: any[]): any {
+  try {
+    const trimmedQuery = query.trim().toLowerCase()
+    
+    if (trimmedQuery.startsWith('select')) {
+      // SELECT queries - return all results
+      const stmt = db.prepare(query)
+      return stmt.all(...params)
+    } else if (trimmedQuery.startsWith('insert') || 
+               trimmedQuery.startsWith('update') || 
+               trimmedQuery.startsWith('delete')) {
+      // Modification queries - return execution info
+      const stmt = db.prepare(query)
+      return stmt.run(...params)
+    } else {
+      // Other queries (CREATE, DROP, etc.) - execute directly
+      return db.exec(query)
+    }
+  } catch (error) {
+    throw new Error(`SQL query failed: ${(error as Error).message}`)
+  }
+}
+
+/**
+ * Query development servers with custom SQL
+ * @param args - Tool arguments containing SQL query and optional parameters
+ * @param context - OpenCode context
+ * @returns Formatted query results
+ */
+export async function executeDevQuery(args: ToolArgs, _context: OpenCodeContext): Promise<string> {
+  try {
+    cleanupRegistry()
+    
+    if (!args.query) {
+      return `No SQL query provided. Example usage:
+      
+kit_devQuery { query: "SELECT script, COUNT(*) as count FROM processes GROUP BY script" }
+kit_devQuery { query: "SELECT * FROM processes WHERE start_time > ?", params: [${Date.now() - 3600000}] }
+
+Available columns: id, script, cwd, pid, start_time, command`
+    }
+    
+    const params = args.params || []
+    const results = executeProcessQuery(args.query, ...params)
+    
+    if (Array.isArray(results)) {
+      if (results.length === 0) {
+        return `Query executed successfully. No results returned.`
+      }
+      
+      // Format results as a table
+      let output = `**Query Results** (${results.length} rows)\n\n`
+      
+      if (results.length > 0) {
+        const firstRow = results[0]
+        const columns = Object.keys(firstRow)
+        
+        // Header
+        output += `| ${columns.join(' | ')} |\n`
+        output += `|${columns.map(() => '---').join('|')}|\n`
+        
+        // Data rows
+        for (const row of results) {
+          const values = columns.map(col => {
+            const val = row[col]
+            if (col === 'start_time') {
+              return new Date(val).toLocaleString()
+            }
+            if (col === 'command') {
+              try {
+                return JSON.parse(val).join(' ')
+              } catch {
+                return val
+              }
+            }
+            return String(val)
+          })
+          output += `| ${values.join(' | ')} |\n`
+        }
+      }
+      
+      return output
+    } else {
+      // Non-SELECT query result
+      return `Query executed successfully. ${JSON.stringify(results)}`
+    }
+    
+  } catch (error) {
+    return `Error executing query: ${(error as Error).message}`
+  }
+}
+
+/**
  * Check if a process is still running
  */
 function isProcessRunning(proc: Subprocess): boolean {

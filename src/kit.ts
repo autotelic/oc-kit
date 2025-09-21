@@ -17,7 +17,7 @@ import { executePackageScript, listPackageScripts } from './package-tools.js'
 import { executeDockerCommand } from './docker-tools.js'
 import { executeComposeCommand } from './compose-tools.js'
 import { listDockerCapabilities } from './docker-list.js'
-import { executeDevStart, executeDevStatus, executeDevStop, executeDevRestart, executeDevStartAll } from './dev-tools.js'
+import { executeDevStart, executeDevStatus, executeDevStop, executeDevRestart, executeDevStartAll, executeDevQuery } from './dev-tools.js'
 
 // OpenCode plugin compatibility layer
 const toolModule = await import('@opencode-ai/plugin').catch(() => {
@@ -235,5 +235,23 @@ export const devStartAll = tool({
   },
   async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
     return executeDevStartAll(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for querying development server database with SQL.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devQuery = tool({
+  description: 'Execute custom SQL queries on the development server process database for advanced monitoring and analysis.',
+  args: {
+    query: tool.schema.string().describe('SQL query to execute (SELECT, INSERT, UPDATE, DELETE)'),
+    params: tool.schema.array(tool.schema.string()).optional().describe('Optional parameters for parameterized queries'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevQuery(args, context)
   }
 })

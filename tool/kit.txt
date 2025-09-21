@@ -10,6 +10,8 @@
 **`kit_devStatus`** - Monitor running background services
 **`kit_devStop`** - Stop specific or all background services
 **`kit_devRestart`** - Restart background services
+**`kit_devStartAll`** - Start multiple services with profiles
+**`kit_devQuery`** - Execute SQL queries on process database
 
 ## 📦 Package Scripts (Primary Use)
 
@@ -36,11 +38,19 @@ kit_devStart { script: "api" }     // Backend server
 kit_devStart { script: "frontend" } // Frontend dev server
 kit_devStart { script: "worker" }   // Background jobs
 
+// Start multiple services at once
+kit_devStartAll { profile: "backend" }  // Start predefined service group
+kit_devStartAll { scripts: ["api", "worker"] }  // Start specific scripts
+
 // Monitor and control
 kit_devStatus {}                    // Show all running services
 kit_devStop { script: "api" }       // Stop specific service  
 kit_devRestart { script: "api" }    // Restart specific service
 kit_devStop {}                      // Stop all services
+
+// Advanced process analysis with SQL
+kit_devQuery { query: "SELECT script, COUNT(*) FROM processes GROUP BY script" }
+kit_devQuery { query: "SELECT * FROM processes WHERE start_time > ?", params: ["1726929000000"] }
 ```
 
 ## ⚡ Key Features
@@ -49,6 +59,8 @@ kit_devStop {}                      // Stop all services
 - **Doppler Integration**: Automatically wraps commands with environment variables
 - **Background Services**: Run dev servers without blocking conversation
 - **Multi-Service Support**: Start/stop/restart multiple services independently
+- **SQLite Process Registry**: In-memory database for advanced process tracking
+- **Generic SQL Querying**: Custom queries for process analysis and monitoring
 - **Structured Output**: Clean exit codes, separated stdout/stderr, timeout protection
 - **Zero Configuration**: Works immediately in any project
 
@@ -56,7 +68,8 @@ kit_devStop {}                      // Stop all services
 
 - All package.json scripts (lint, test, build, dev)
 - Docker operations (up/down, logs, build, exec)
-- Development server management
+- Development server management and process monitoring
+- Advanced process analytics with custom SQL queries
 - Monorepo workspace filtering
 - CI/CD automation
 

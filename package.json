@@ -2,8 +2,9 @@
   "name": "@autotelic/oc-kit",
   "version": "1.0.0",
   "description": "Custom automation tools for opencode that replace bash commands with smart package.json script and Docker operations",
-  "main": "src/kit.ts",
-  "module": "src/kit.ts",
+  "main": "dist/kit.js",
+  "module": "dist/kit.js",
+  "types": "dist/kit.d.ts",
   "type": "module",
   "private": true,
   "author": "Autotelic",
@@ -32,7 +33,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "bun run typecheck && bun build src/kit.ts --outdir=dist --target=bun",
+    "build": "bun run typecheck && tsc -p tsconfig.build.json && bun build src/kit.ts --outdir=dist --target=bun",
     "typecheck": "tsc --noEmit",
     "lint": "bun run typecheck",
     "test": "bun test src/",

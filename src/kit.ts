@@ -60,7 +60,7 @@ const DESCRIPTION = await Bun.file(`${import.meta.dir}/../tool/kit.txt`).text()
  * @see https://github.com/autotelic/oc-kit - Source code and documentation
  * @see https://opencode.ai/docs/custom-tools - opencode custom tools documentation
  */
-export default tool({
+export const run = tool({
   description: DESCRIPTION,
   args: {
     script: tool.schema.string().describe("Name of the script to run (e.g., 'build', 'test', 'dev')"),

@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/kit.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "node_modules",
+    "dist"
+  ]
+}

@@ -17,7 +17,6 @@ import { resolveWorkingDirectory } from '../utils/common.js'
 const tool = await getOpenCodeTool()
 
 // Load tool description
-// eslint-disable-next-line no-undef
 const DESCRIPTION = await Bun.file(`${import.meta.dir}/../../tool/kit.txt`).text()
 
 /**
@@ -136,7 +135,6 @@ export async function listPackageScripts(args: ToolArgs, context: OpenCodeContex
     const packageJson = await getPackageJson(workingDir)
     const scripts = getScripts(packageJson)
     
-    // eslint-disable-next-line no-undef
     const packagePath = Bun.resolveSync('./package.json', workingDir)
 
     const scriptList = Object.entries(scripts)

@@ -1,4 +1,40 @@
 rules:
+  # === DOCUMENTATION PATTERNS ===
+  
+  - id: missing-jsdoc-functions
+    message: "Function missing JSDoc documentation"
+    severity: warning
+    language: typescript
+    rule:
+      pattern: |
+        function $NAME($$$ARGS) {
+          $$$BODY
+        }
+      not:
+        has:
+          pattern: |
+            /**
+             * $$$DOC
+             */
+    note: "Add JSDoc documentation for better maintainability"
+
+  - id: missing-jsdoc-export-functions
+    message: "Exported function missing JSDoc documentation"
+    severity: error
+    language: typescript
+    rule:
+      pattern: |
+        export function $NAME($$$ARGS) {
+          $$$BODY
+        }
+      not:
+        has:
+          pattern: |
+            /**
+             * $$$DOC
+             */
+    note: "Public functions must have JSDoc documentation"
+
   # === ARCHITECTURE PATTERNS ===
   
   - id: tool-export-complete
@@ -248,6 +284,43 @@ rules:
         (args: ToolArgs, context: OpenCodeContext)
     note: "Standard parameter pattern for kit tools"
 
+  # === CODE SMELLS & REFACTORING ===
+
+  - id: eslint-disable-inconsistent
+    message: "Inconsistent eslint-disable usage"
+    severity: warning
+    language: typescript
+    rule:
+      pattern: // eslint-disable-next-line no-undef
+    note: "Consider proper TypeScript configuration instead of disabling eslint rules"
+
+  - id: complex-if-else-chain
+    message: "Complex if-else chain - consider refactoring"
+    severity: warning
+    language: typescript
+    rule:
+      pattern: |
+        if ($$$) {
+          $$$THEN
+        } else if ($$$) {
+          $$$ELSE_IF
+        } else {
+          $$$ELSE
+        }
+    note: "Consider extracting to separate functions or using strategy pattern"
+
+  - id: magic-string-pattern
+    message: "Magic string detected - consider constants"
+    severity: info
+    language: typescript
+    rule:
+      any:
+        - pattern: $VAR.includes('build')
+        - pattern: $VAR.includes('test')
+        - pattern: $VAR.includes('dev')
+        - pattern: $VAR.includes('start')
+    note: "Consider defining string constants for better maintainability"
+
   # === TESTING PATTERNS ===
 
   - id: mock-context-usage
@@ -268,3 +341,21 @@ rules:
         - pattern: expect($VAL).toBeDefined()
         - pattern: expect($VAL).not.toContain($$$)
     note: "Test assertions for validation"
+
+  # === IMPORT/EXPORT CONSISTENCY ===
+
+  - id: bun-test-import-standard
+    message: "Standard Bun test framework import"
+    severity: info
+    language: typescript
+    rule:
+      pattern: import { $$$IMPORTS } from 'bun:test'
+    note: "Using Bun's native test framework consistently"
+
+  - id: relative-import-js-extension
+    message: "Relative import with .js extension"
+    severity: info
+    language: typescript
+    rule:
+      pattern: import { $$$IMPORTS } from './$MODULE.js'
+    note: "Good practice: explicit .js extensions for ES modules"

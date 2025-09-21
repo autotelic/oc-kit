@@ -3,6 +3,7 @@
  */
 
 import type { CommandResult, ExecutionOptions } from '../types.js'
+import { SCRIPT_TYPES, BUILD_SUCCESS_INDICATORS, TEST_SUCCESS_INDICATORS } from '../utils/constants.js'
 
 /**
  * Executes a shell command with timeout protection and structured error handling
@@ -17,7 +18,6 @@ export async function executeCommand(
   const startTime = Date.now()
   
   try {
-    // eslint-disable-next-line no-undef
     const proc = Bun.spawn(command, {
       cwd: options.cwd,
       stdout: 'pipe',
@@ -130,20 +130,20 @@ function getContextMessage(scriptName: string, result: CommandResult): string {
   const stdout = result.stdout.toLowerCase()
   
   // Build scripts
-  if (scriptName.includes('build')) {
-    if (stdout.includes('built') || stdout.includes('compiled')) {
+  if (scriptName.includes(SCRIPT_TYPES.BUILD)) {
+    if (BUILD_SUCCESS_INDICATORS.some(indicator => stdout.includes(indicator))) {
       return '🏗️  Build artifacts generated'
     }
     return '🏗️  Build process completed'
   }
   
   // Test scripts
-  if (scriptName.includes('test')) {
+  if (scriptName.includes(SCRIPT_TYPES.TEST)) {
     const testMatch = stdout.match(/(\d+)\s+(?:tests?|specs?)\s+passed/i)
     if (testMatch) {
       return `✅ ${testMatch[1]} tests passed`
     }
-    if (stdout.includes('passed') || stdout.includes('ok')) {
+    if (TEST_SUCCESS_INDICATORS.some(indicator => stdout.includes(indicator))) {
       return '✅ All tests passed'
     }
     return '🧪 Test suite completed'
@@ -265,7 +265,7 @@ function getSuggestions(scriptName: string, result: CommandResult): string {
   }
   
   // Script-specific suggestions
-  if (scriptName.includes('build')) {
+  if (scriptName.includes(SCRIPT_TYPES.BUILD)) {
     if (combinedOutput.includes('type') && combinedOutput.includes('error')) {
       suggestions.push('• Run type checking first: `npm run typecheck` or similar')
     }
@@ -274,7 +274,7 @@ function getSuggestions(scriptName: string, result: CommandResult): string {
     }
   }
   
-  if (scriptName.includes('test')) {
+  if (scriptName.includes(SCRIPT_TYPES.TEST)) {
     if (combinedOutput.includes('timeout')) {
       suggestions.push('• Tests may be taking too long - consider increasing timeout or optimizing slow tests')
     }

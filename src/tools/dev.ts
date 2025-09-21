@@ -10,6 +10,7 @@ import { getPackageJson, getScripts, detectPackageManager } from '../core/packag
 import { wrapWithDoppler } from '../core/doppler.js'
 import { getOpenCodeTool } from '../core/plugin-compat.js'
 import { resolveWorkingDirectory } from '../utils/common.js'
+import { COMMON_DEV_SCRIPTS } from '../utils/constants.js'
 
 // In-memory SQLite database (session-scoped, no disk persistence)
 const db = new Database(":memory:")
@@ -604,8 +605,7 @@ async function executeDevStartAll(args: ToolArgs, context: OpenCodeContext): Pro
       const packageJson = await getPackageJson(workingDir)
       const scripts = getScripts(packageJson)
       
-      const commonDevScripts = ['dev', 'start', 'serve', 'api', 'frontend', 'backend', 'worker']
-      scriptsToStart = commonDevScripts.filter(script => scripts[script])
+      scriptsToStart = COMMON_DEV_SCRIPTS.filter(script => scripts[script])
       
       if (scriptsToStart.length === 0) {
         const availableScripts = Object.keys(scripts)

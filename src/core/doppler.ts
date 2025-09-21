@@ -65,7 +65,6 @@ async function detectDopplerCapabilities(workingDir: string): Promise<DopplerCap
  */
 async function checkDopplerAvailability(): Promise<boolean> {
   try {
-    // eslint-disable-next-line no-undef
     const dopplerCheck = Bun.spawn(['doppler', '--version'], {
       stdout: 'pipe',
       stderr: 'pipe'
@@ -82,9 +81,13 @@ async function checkDopplerAvailability(): Promise<boolean> {
  * @param workingDir - Directory to search for config files
  * @param capabilities - Capabilities object to update with findings
  */
+/**
+ * Checks for Doppler configuration files in the working directory
+ * @param workingDir - Directory to scan for Doppler config files
+ * @param capabilities - DopplerCapabilities object to populate with findings
+ */
 async function checkDopplerConfig(workingDir: string, capabilities: DopplerCapabilities) {
   // Check for doppler.yaml first
-  // eslint-disable-next-line no-undef
   const dopplerYaml = Bun.file(`${workingDir}/doppler.yaml`)
   if (await dopplerYaml.exists()) {
     try {
@@ -102,7 +105,6 @@ async function checkDopplerConfig(workingDir: string, capabilities: DopplerCapab
   }
 
   // Check for .doppler/cli.json
-  // eslint-disable-next-line no-undef
   const dopplerJson = Bun.file(`${workingDir}/.doppler/cli.json`)
   if (await dopplerJson.exists()) {
     try {

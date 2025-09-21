@@ -2,43 +2,46 @@
  * Docker capabilities detection and utilities
  */
 
-import type { DockerCapabilities } from '../types.js'
+import type { DockerCapabilities } from '../types.js';
+import { SERVICE_PATTERNS } from '../utils/constants.js';
 
 /** Cache for Docker capabilities to avoid repeated filesystem scanning */
-let dockerCapabilitiesCache: DockerCapabilities | null = null
+let dockerCapabilitiesCache: DockerCapabilities | null = null;
 /** Directory for which capabilities are cached */
-let cacheDir: string | null = null
+let cacheDir: string | null = null;
 /** Promise for in-flight detection to prevent concurrent scans */
-let dockerCachePromise: Promise<DockerCapabilities> | null = null
+let dockerCachePromise: Promise<DockerCapabilities> | null = null;
 
 /**
  * Gets Docker capabilities for a directory with caching
  * @param workingDir - Directory to scan for Docker files and configuration
  * @returns Promise resolving to Docker capabilities
  */
-export async function getDockerCapabilities(workingDir: string): Promise<DockerCapabilities> {
+export async function getDockerCapabilities(
+  workingDir: string
+): Promise<DockerCapabilities> {
   if (dockerCapabilitiesCache && cacheDir === workingDir) {
-    return dockerCapabilitiesCache
+    return dockerCapabilitiesCache;
   }
 
   if (dockerCachePromise) {
-    return dockerCachePromise
+    return dockerCachePromise;
   }
 
-  dockerCapabilitiesCache = null
-  cacheDir = null
+  dockerCapabilitiesCache = null;
+  cacheDir = null;
 
-  dockerCachePromise = detectDockerCapabilities(workingDir)
-  const capabilities = await dockerCachePromise
+  dockerCachePromise = detectDockerCapabilities(workingDir);
+  const capabilities = await dockerCachePromise;
 
   // eslint-disable-next-line require-atomic-updates
-  dockerCapabilitiesCache = capabilities
+  dockerCapabilitiesCache = capabilities;
   // eslint-disable-next-line require-atomic-updates
-  cacheDir = workingDir
+  cacheDir = workingDir;
   // eslint-disable-next-line require-atomic-updates
-  dockerCachePromise = null
+  dockerCachePromise = null;
 
-  return capabilities
+  return capabilities;
 }
 
 /**
@@ -46,7 +49,9 @@ export async function getDockerCapabilities(workingDir: string): Promise<DockerC
  * @param workingDir - Directory to scan for Docker-related files
  * @returns Promise resolving to detected Docker capabilities
  */
-async function detectDockerCapabilities(workingDir: string): Promise<DockerCapabilities> {
+async function detectDockerCapabilities(
+  workingDir: string
+): Promise<DockerCapabilities> {
   const capabilities: DockerCapabilities = {
     dockerAvailable: false,
     hasDockerfile: false,
@@ -55,15 +60,15 @@ async function detectDockerCapabilities(workingDir: string): Promise<DockerCapab
     services: new Set(),
     networks: new Set(),
     volumes: new Set(),
-    profiles: {}
-  }
+    profiles: {},
+  };
 
-  capabilities.dockerAvailable = await checkDockerAvailability()
-  await findDockerfiles(workingDir, capabilities)
-  await findAndParseComposeFiles(workingDir, capabilities)
-  generateServiceProfiles(capabilities)
-  
-  return capabilities
+  capabilities.dockerAvailable = await checkDockerAvailability();
+  await findDockerfiles(workingDir, capabilities);
+  await findAndParseComposeFiles(workingDir, capabilities);
+  generateServiceProfiles(capabilities);
+
+  return capabilities;
 }
 
 /**
@@ -72,33 +77,34 @@ async function detectDockerCapabilities(workingDir: string): Promise<DockerCapab
  */
 async function checkDockerAvailability(): Promise<boolean> {
   try {
-    // eslint-disable-next-line no-undef
     const dockerCheck = Bun.spawn(['docker', '--version'], {
       stdout: 'pipe',
-      stderr: 'pipe'
-    })
-    await dockerCheck.exited
-    return dockerCheck.exitCode === 0
+      stderr: 'pipe',
+    });
+    await dockerCheck.exited;
+    return dockerCheck.exitCode === 0;
   } catch {
-    return false
+    return false;
   }
 }
 
 /**
- * Scans directory for Dockerfile and related files
- * @param dir - Directory to search for Dockerfiles
- * @param capabilities - Capabilities object to update with findings
+ * Recursively searches for Dockerfile patterns in the project directory
+ * @param dir - Directory to scan for Dockerfiles
+ * @param capabilities - DockerCapabilities object to populate with found Dockerfiles
  */
 async function findDockerfiles(dir: string, capabilities: DockerCapabilities) {
-  // eslint-disable-next-line no-undef
-  const dockerfileGlob = new Bun.Glob('**/Dockerfile*')
+  const dockerfileGlob = new Bun.Glob('**/Dockerfile*');
 
   try {
-    for await (const file of dockerfileGlob.scan({ cwd: dir, absolute: true })) {
+    for await (const file of dockerfileGlob.scan({
+      cwd: dir,
+      absolute: true,
+    })) {
       if (!file.includes('node_modules') && !file.includes('.git')) {
-        capabilities.dockerfiles.push(file)
+        capabilities.dockerfiles.push(file);
         if (file.endsWith('Dockerfile')) {
-          capabilities.hasDockerfile = true
+          capabilities.hasDockerfile = true;
         }
       }
     }
@@ -112,23 +118,25 @@ async function findDockerfiles(dir: string, capabilities: DockerCapabilities) {
  * @param dir - Directory to search for Compose files
  * @param capabilities - Capabilities object to update with findings
  */
-async function findAndParseComposeFiles(dir: string, capabilities: DockerCapabilities) {
+async function findAndParseComposeFiles(
+  dir: string,
+  capabilities: DockerCapabilities
+) {
   const composePatterns = [
     '**/docker-compose.yml',
     '**/docker-compose.yaml',
     '**/compose.yml',
-    '**/compose.yaml'
-  ]
+    '**/compose.yaml',
+  ];
 
   for (const pattern of composePatterns) {
-    // eslint-disable-next-line no-undef
-    const glob = new Bun.Glob(pattern)
+    const glob = new Bun.Glob(pattern);
 
     try {
       for await (const file of glob.scan({ cwd: dir, absolute: true })) {
         if (!file.includes('node_modules') && !file.includes('.git')) {
-          capabilities.composeFiles.push(file)
-          await parseComposeFile(file, capabilities)
+          capabilities.composeFiles.push(file);
+          await parseComposeFile(file, capabilities);
         }
       }
     } catch {
@@ -142,53 +150,66 @@ async function findAndParseComposeFiles(dir: string, capabilities: DockerCapabil
  * @param filePath - Path to the Compose file to parse
  * @param capabilities - Capabilities object to update with parsed information
  */
-async function parseComposeFile(filePath: string, capabilities: DockerCapabilities) {
+async function parseComposeFile(
+  filePath: string,
+  capabilities: DockerCapabilities
+) {
   try {
-    // eslint-disable-next-line no-undef
-    const content = await Bun.file(filePath).text()
-    const lines = content.split('\n')
-    
-    let inServices = false
-    let inNetworks = false
-    let inVolumes = false
+    const content = await Bun.file(filePath).text();
+    const lines = content.split('\n');
+
+    let inServices = false;
+    let inNetworks = false;
+    let inVolumes = false;
 
     for (const line of lines) {
-      const trimmed = line.trim()
+      const trimmed = line.trim();
 
       if (line === 'services:') {
-        inServices = true
-        inNetworks = false
-        inVolumes = false
-        continue
+        inServices = true;
+        inNetworks = false;
+        inVolumes = false;
+        continue;
       } else if (line === 'networks:') {
-        inServices = false
-        inNetworks = true
-        inVolumes = false
-        continue
+        inServices = false;
+        inNetworks = true;
+        inVolumes = false;
+        continue;
       } else if (line === 'volumes:') {
-        inServices = false
-        inNetworks = false
-        inVolumes = true
-        continue
-      } else if (line.match(/^[a-zA-Z][a-zA-Z0-9_-]*:/) && !trimmed.includes(' ')) {
-        inServices = false
-        inNetworks = false
-        inVolumes = false
+        inServices = false;
+        inNetworks = false;
+        inVolumes = true;
+        continue;
+      } else if (
+        line.match(/^[a-zA-Z][a-zA-Z0-9_-]*:/) &&
+        !trimmed.includes(' ')
+      ) {
+        inServices = false;
+        inNetworks = false;
+        inVolumes = false;
       }
 
       if (inServices && line.match(/^ {2}[a-zA-Z][a-zA-Z0-9_-]*:/)) {
-        const serviceName = trimmed.replace(':', '')
-        capabilities.services.add(serviceName)
+        const serviceName = trimmed.replace(':', '');
+        capabilities.services.add(serviceName);
       }
 
-      if (inNetworks && trimmed.match(/^[a-zA-Z][a-zA-Z0-9_-]*:/) && !trimmed.includes(' ')) {
-        const networkName = trimmed.replace(':', '')
-        capabilities.networks.add(networkName)
+      if (
+        inNetworks &&
+        trimmed.match(/^[a-zA-Z][a-zA-Z0-9_-]*:/) &&
+        !trimmed.includes(' ')
+      ) {
+        const networkName = trimmed.replace(':', '');
+        capabilities.networks.add(networkName);
       }
 
-      if (inVolumes && trimmed.match(/^[a-zA-Z][a-zA-Z0-9_-]*:/) && !trimmed.includes(' ')) {
-        const volumeName = trimmed.replace(':', '')
-        capabilities.volumes.add(volumeName)
+      if (
+        inVolumes &&
+        trimmed.match(/^[a-zA-Z][a-zA-Z0-9_-]*:/) &&
+        !trimmed.includes(' ')
+      ) {
+        const volumeName = trimmed.replace(':', '');
+        capabilities.volumes.add(volumeName);
       }
     }
   } catch {
@@ -202,42 +223,46 @@ async function parseComposeFile(filePath: string, capabilities: DockerCapabiliti
  * @param capabilities - Capabilities object to update with generated profiles
  */
 function generateServiceProfiles(capabilities: DockerCapabilities) {
-  const services = Array.from(capabilities.services)
+  const services = Array.from(capabilities.services);
 
-  if (services.length === 0) return
+  if (services.length === 0) return;
 
-  const databases = services.filter(service => 
-    service.toLowerCase().includes('db') ||
-    service.toLowerCase().includes('postgres') ||
-    service.toLowerCase().includes('mysql') ||
-    service.toLowerCase().includes('mongo')
-  )
+  const databases = services.filter((service) =>
+    SERVICE_PATTERNS.DATABASE.some((pattern) =>
+      service.toLowerCase().includes(pattern)
+    )
+  );
   if (databases.length > 0) {
-    capabilities.profiles.database = databases
+    capabilities.profiles.database = databases;
   }
 
-  const cache = services.filter(service => 
-    service.toLowerCase().includes('redis') ||
-    service.toLowerCase().includes('memcached') ||
-    service.toLowerCase().includes('cache')
-  )
+  const cache = services.filter((service) =>
+    SERVICE_PATTERNS.CACHE.some((pattern) =>
+      service.toLowerCase().includes(pattern)
+    )
+  );
   if (cache.length > 0) {
-    capabilities.profiles.cache = cache
+    capabilities.profiles.cache = cache;
   }
 
-  const test = services.filter(service => 
-    service.toLowerCase().includes('test')
-  )
+  const test = services.filter((service) =>
+    SERVICE_PATTERNS.TEST.some((pattern) =>
+      service.toLowerCase().includes(pattern)
+    )
+  );
   if (test.length > 0) {
-    capabilities.profiles.test = test
+    capabilities.profiles.test = test;
   }
 
-  const dev = services.filter(service => 
-    !service.toLowerCase().includes('test')
-  )
+  const dev = services.filter(
+    (service) =>
+      !SERVICE_PATTERNS.TEST.some((pattern) =>
+        service.toLowerCase().includes(pattern)
+      )
+  );
   if (dev.length > 0) {
-    capabilities.profiles.dev = dev
+    capabilities.profiles.dev = dev;
   }
 
-  capabilities.profiles.all = services
+  capabilities.profiles.all = services;
 }

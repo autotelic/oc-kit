@@ -36,7 +36,6 @@ const PACKAGE_MANAGERS: PackageManagerConfig[] = [
 export async function detectPackageManager(dir: string): Promise<PackageManager> {
   for (const { lockFile, manager } of PACKAGE_MANAGERS) {
     const lockFilePath = `${dir}/${lockFile}`
-    // eslint-disable-next-line no-undef
     const file = Bun.file(lockFilePath)
     
     if (await file.exists()) {
@@ -53,9 +52,7 @@ export async function detectPackageManager(dir: string): Promise<PackageManager>
  * @returns Parsed package.json content as a record
  */
 export async function getPackageJson(workingDir: string): Promise<Record<string, unknown>> {
-  // eslint-disable-next-line no-undef
   const packagePath = Bun.resolveSync('./package.json', workingDir)
-  // eslint-disable-next-line no-undef
   return await Bun.file(packagePath).json() as Record<string, unknown>
 }
 

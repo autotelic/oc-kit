@@ -2,7 +2,7 @@
  * Utility functions for building Docker and Docker Compose commands
  */
 
-import type { ToolArgs, DockerCapabilities } from './types.js'
+import type { ToolArgs, DockerCapabilities } from '../types.js'
 
 /**
  * Standard validation result for command building

@@ -8,7 +8,7 @@ import {
   getScripts,
   buildPackageCommand,
   type PackageManager
-} from './package-manager'
+} from './package-manager.js'
 
 describe('Package Manager Detection', () => {
   let testDir: string

@@ -3,8 +3,8 @@
  * Note: executeCommand tests are skipped due to Bun global mocking limitations
  */
 import { describe, test, expect } from 'bun:test'
-import { formatCommandResult, getDockerTimeout, getComposeTimeout } from './execution'
-import type { CommandResult } from './types'
+import { formatCommandResult, getDockerTimeout, getComposeTimeout } from './execution.js'
+import type { CommandResult } from '../types.js'
 
 // Skip executeCommand tests due to global mocking limitations in Bun
 // These would require mocking globalThis.Bun and globalThis.Response which are readonly

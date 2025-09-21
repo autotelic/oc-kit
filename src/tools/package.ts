@@ -1,14 +1,46 @@
 /**
- * Package.json script tool implementations
+ * Package.json script execution tools
+ * Part of @autotelic/oc-kit
  */
 
-import type { ToolArgs, OpenCodeContext } from './types.js'
-import { detectPackageManager, getPackageJson, getScripts, buildPackageCommand } from './package-manager.js'
-import { wrapWithDoppler } from './doppler.js'
-import { executeCommand, formatCommandResult } from './execution.js'
-import { validateScriptName, validateArgumentArray } from './security-validation.js'
-import { checkScriptGuardrails, DEFAULT_SECURITY_CONFIG } from './security-guardrails.js'
-import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from './streaming.js'
+import type { ToolArgs, OpenCodeContext } from '../types.js'
+import { detectPackageManager, getPackageJson, getScripts, buildPackageCommand } from '../core/package-manager.js'
+import { wrapWithDoppler } from '../core/doppler.js'
+import { executeCommand, formatCommandResult } from '../core/execution.js'
+import { validateScriptName, validateArgumentArray } from '../core/security-validation.js'
+import { checkScriptGuardrails, DEFAULT_SECURITY_CONFIG } from '../core/security-guardrails.js'
+import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from '../core/streaming.js'
+
+// OpenCode plugin compatibility layer
+const toolModule = await import('@opencode-ai/plugin').catch(() => {
+  const mockDescribe = { 
+    describe: (_d: string) => mockDescribe,
+    optional: () => mockDescribe,
+    _zod: true as any
+  }
+  const mockOptional = { 
+    describe: (_d: string) => mockOptional,
+    optional: () => mockDescribe,
+    _zod: true as any
+  }
+  
+  return {
+    tool: Object.assign((config: any) => config, {
+      schema: {
+        string: () => mockDescribe,
+        array: () => mockOptional,
+        enum: () => mockOptional,
+        boolean: () => mockOptional,
+        number: () => mockOptional
+      }
+    })
+  }
+})
+const { tool } = toolModule
+
+// Load tool description
+// eslint-disable-next-line no-undef
+const DESCRIPTION = await Bun.file(`${import.meta.dir}/../../tool/kit.txt`).text()
 
 /**
  * Executes a package.json script with package manager auto-detection and Doppler integration
@@ -121,3 +153,43 @@ export async function listPackageScripts(args: ToolArgs, context: OpenCodeContex
     return `Error reading package.json: ${(error as Error).message}`
   }
 }
+
+/**
+ * Custom opencode tool for running package.json scripts with smart automation and Doppler integration.
+ * 
+ * This is an Autotelic-built tool that provides superior automation over bash commands for package.json
+ * scripts and Docker operations. It auto-detects package managers, integrates with Doppler for environment
+ * variables, and provides structured output with proper error handling.
+ * 
+ * @see https://github.com/autotelic/oc-kit - Source code and documentation
+ * @see https://opencode.ai/docs/custom-tools - opencode custom tools documentation
+ */
+export const run = tool({
+  description: DESCRIPTION,
+  args: {
+    script: tool.schema.string().describe("Name of the script to run (e.g., 'build', 'test', 'dev')"),
+    args: tool.schema.array(tool.schema.string()).optional().describe('Additional arguments to pass to the script'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)'),
+    packageManager: tool.schema.enum(['npm', 'yarn', 'pnpm', 'bun']).optional().describe('Package manager to use (auto-detected if not specified)'),
+    skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executePackageScript(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for listing all available scripts in package.json.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const list = tool({
+  description: 'List all available scripts in package.json',
+  args: {
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return listPackageScripts(args, context)
+  }
+})

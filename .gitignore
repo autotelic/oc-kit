@@ -5,5 +5,10 @@ dist/
 .env*
 !.env.example
 
+# Build artifacts
+*.tgz
+
 # Include opencode config for dogfooding
 !.opencode/
+
+opencode

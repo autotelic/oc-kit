@@ -12,14 +12,14 @@ import {
   validateContainerName,
   validateImageName,
   isDestructiveOperation
-} from '../src/security-validation.js'
+} from './security-validation.js'
 import {
   checkOperationGuardrails,
   checkScriptGuardrails,
   checkDockerVolumeMounts,
   checkDockerNetworkSettings,
   DEFAULT_SECURITY_CONFIG
-} from '../src/security-guardrails.js'
+} from './security-guardrails.js'
 
 describe('Security Validation', () => {
   describe('validateArgument', () => {

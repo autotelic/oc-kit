@@ -1,11 +1,12 @@
 /**
- * Docker Compose tool implementations
+ * Docker Compose operation tools
+ * Part of @autotelic/oc-kit
  */
 
-import type { ToolArgs, OpenCodeContext } from './types.js'
-import { getDockerCapabilities } from './docker.js'
-import { wrapWithDoppler } from './doppler.js'
-import { executeCommand, formatCommandResult, getComposeTimeout } from './execution.js'
+import type { ToolArgs, OpenCodeContext } from '../types.js'
+import { getDockerCapabilities } from '../core/docker.js'
+import { wrapWithDoppler } from '../core/doppler.js'
+import { executeCommand, formatCommandResult, getComposeTimeout } from '../core/execution.js'
 import {
   validateAction,
   validateDockerAvailable,
@@ -14,15 +15,15 @@ import {
   resolveComposeFile,
   resolveTargetServices,
   SPECIAL_ARG_ACTIONS
-} from './docker-command-utils.js'
-import { validateDockerArgs } from './security-validation.js'
+} from '../utils/docker-command-utils.js'
+import { validateDockerArgs } from '../core/security-validation.js'
 import {
   checkOperationGuardrails,
   checkDockerVolumeMounts,
   checkDockerNetworkSettings,
   DEFAULT_SECURITY_CONFIG
-} from './security-guardrails.js'
-import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from './streaming.js'
+} from '../core/security-guardrails.js'
+import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createOutputStreamers } from '../core/streaming.js'
 
 /**
  * Builds a Docker Compose command based on the provided arguments
@@ -30,7 +31,7 @@ import { executeWithStreaming, shouldUseStreaming, createProgressLogger, createO
  * @param capabilities - Docker capabilities for file and service resolution
  * @returns Command array ready for execution or error string
  */
-export function buildComposeCommand(args: ToolArgs, capabilities: any): string[] | string {
+function buildComposeCommand(args: ToolArgs, capabilities: any): string[] | string {
   const actionValidation = validateAction(args.action)
   if (!actionValidation.valid) {
     return actionValidation.error!
@@ -192,3 +193,54 @@ export async function executeComposeCommand(args: ToolArgs, context: OpenCodeCon
     return formatCommandResult(result)
   }
 }
+
+// OpenCode plugin compatibility layer
+const toolModule = await import('@opencode-ai/plugin').catch(() => {
+  const mockDescribe = { 
+    describe: (_d: string) => mockDescribe,
+    optional: () => mockDescribe,
+    _zod: true as any
+  }
+  const mockOptional = { 
+    describe: (_d: string) => mockOptional,
+    optional: () => mockDescribe,
+    _zod: true as any
+  }
+  
+  return {
+    tool: Object.assign((config: any) => config, {
+      schema: {
+        string: () => mockDescribe,
+        array: () => mockOptional,
+        enum: () => mockOptional,
+        boolean: () => mockOptional,
+        number: () => mockOptional
+      }
+    })
+  }
+})
+const { tool } = toolModule
+
+/**
+ * Custom opencode tool for executing Docker Compose operations.
+ * Part of the @autotelic/oc-kit package. Only available if compose files are detected.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const compose = tool({
+  description: 'Execute Docker Compose operations. Auto-detects compose files and services, supports profiles and service selection.',
+  args: {
+    action: tool.schema.enum(['up', 'down', 'build', 'logs', 'exec', 'ps', 'restart', 'stop', 'start', 'pull']).describe('Docker Compose action to perform'),
+    services: tool.schema.array(tool.schema.string()).optional().describe('Specific services to target (leave empty for all)'),
+    profile: tool.schema.string().optional().describe('Service profile to use (database, cache, test, dev, all)'),
+    file: tool.schema.string().optional().describe('Specific compose file to use (auto-detects if not specified)'),
+    detach: tool.schema.boolean().optional().describe('Run in detached mode (default: true for up action)'),
+    args: tool.schema.array(tool.schema.string()).optional().describe('Additional arguments to pass to docker-compose'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)'),
+    timeout: tool.schema.number().optional().describe('Timeout in milliseconds (default: 30s for logs, 5min for build/up/pull, 30s for others)'),
+    skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeComposeCommand(args, context)
+  }
+})

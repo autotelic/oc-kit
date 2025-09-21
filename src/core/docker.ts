@@ -2,7 +2,7 @@
  * Docker capabilities detection and utilities
  */
 
-import type { DockerCapabilities } from './types.js'
+import type { DockerCapabilities } from '../types.js'
 
 /** Cache for Docker capabilities to avoid repeated filesystem scanning */
 let dockerCapabilitiesCache: DockerCapabilities | null = null

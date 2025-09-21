@@ -13,8 +13,8 @@ import {
   CONTAINER_ACTIONS,
   IMAGE_ACTIONS,
   SPECIAL_ARG_ACTIONS
-} from './docker-command-utils'
-import type { DockerCapabilities, ToolArgs } from './types'
+} from './docker-command-utils.js'
+import type { DockerCapabilities, ToolArgs } from '../types.js'
 
 describe('Command Validation', () => {
   test('validateAction succeeds with valid action', () => {

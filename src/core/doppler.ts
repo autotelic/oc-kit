@@ -2,7 +2,7 @@
  * Doppler CLI integration utilities
  */
 
-import type { DopplerCapabilities } from './types.js'
+import type { DopplerCapabilities } from '../types.js'
 
 /** Cache for Doppler capabilities to avoid repeated detection */
 let dopplerCapabilitiesCache: DopplerCapabilities | null = null

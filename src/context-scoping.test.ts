@@ -8,10 +8,10 @@
 
 import { describe, test, expect } from 'bun:test'
 import type { OpenCodeContext } from './types.js'
-import { executePackageScript } from './package-tools.js'
-import { executeDockerCommand } from './docker-tools.js'
-import { executeComposeCommand } from './compose-tools.js'
-import { listDockerCapabilities } from './docker-list.js'
+import { executePackageScript } from './tools/package.js'
+import { executeDockerCommand } from './tools/docker.js'
+import { executeComposeCommand } from './tools/compose.js'
+import { listDockerCapabilities } from './tools/docker.js'
 
 // Mock context with specific working directory
 const mockContext: OpenCodeContext = {

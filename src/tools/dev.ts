@@ -1,13 +1,13 @@
 /**
  * Development server management tools
- * True background process spawning within OpenCode sessions
+ * Part of @autotelic/oc-kit
  */
 
 import { Database } from "bun:sqlite"
 import type { Subprocess } from 'bun'
-import type { ToolArgs, OpenCodeContext } from './types.js'
-import { getPackageJson, getScripts, detectPackageManager } from './package-manager.js'
-import { wrapWithDoppler } from './doppler.js'
+import type { ToolArgs, OpenCodeContext } from '../types.js'
+import { getPackageJson, getScripts, detectPackageManager } from '../core/package-manager.js'
+import { wrapWithDoppler } from '../core/doppler.js'
 
 // In-memory SQLite database (session-scoped, no disk persistence)
 const db = new Database(":memory:")
@@ -63,7 +63,7 @@ const processObjects = new Map<string, Subprocess>()
  * @param params - Optional parameters for the query
  * @returns Query results or execution info
  */
-export function executeProcessQuery(query: string, ...params: any[]): any {
+function executeProcessQuery(query: string, ...params: any[]): any {
   try {
     const trimmedQuery = query.trim().toLowerCase()
     
@@ -92,7 +92,7 @@ export function executeProcessQuery(query: string, ...params: any[]): any {
  * @param context - OpenCode context
  * @returns Formatted query results
  */
-export async function executeDevQuery(args: ToolArgs, _context: OpenCodeContext): Promise<string> {
+async function executeDevQuery(args: ToolArgs, _context: OpenCodeContext): Promise<string> {
   try {
     cleanupRegistry()
     
@@ -243,7 +243,7 @@ function unregisterProcess(script: string, cwd: string): void {
  * @param context - OpenCode context containing session information
  * @returns Promise resolving immediately after starting background process
  */
-export async function executeDevStart(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+async function executeDevStart(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   // Use context working directory, then args.cwd, then fallback to process.cwd()
   const workingDir = args.cwd || context.cwd || process.cwd()
 
@@ -374,7 +374,7 @@ The development server will continue running while you work. It will automatical
 /**
  * Check status of background development servers
  */
-export async function executeDevStatus(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+async function executeDevStatus(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   const workingDir = args.cwd || context.cwd || process.cwd()
   
   try {
@@ -411,7 +411,7 @@ export async function executeDevStatus(args: ToolArgs, context: OpenCodeContext)
 /**
  * Stop background development servers
  */
-export async function executeDevStop(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+async function executeDevStop(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   const workingDir = args.cwd || context.cwd || process.cwd()
   
   try {
@@ -502,7 +502,7 @@ export async function executeDevStop(args: ToolArgs, context: OpenCodeContext): 
 /**
  * Restart background development servers
  */
-export async function executeDevRestart(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+async function executeDevRestart(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   const workingDir = args.cwd || context.cwd || process.cwd()
   
   try {
@@ -572,7 +572,7 @@ export async function executeDevRestart(args: ToolArgs, context: OpenCodeContext
 /**
  * Start multiple development services at once
  */
-export async function executeDevStartAll(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+async function executeDevStartAll(args: ToolArgs, context: OpenCodeContext): Promise<string> {
   const workingDir = args.cwd || context.cwd || process.cwd()
   
   try {
@@ -650,3 +650,133 @@ export async function executeDevStartAll(args: ToolArgs, context: OpenCodeContex
     return `Error starting multiple development services: ${(error as Error).message}`
   }
 }
+
+// OpenCode plugin compatibility layer
+const toolModule = await import('@opencode-ai/plugin').catch(() => {
+  const mockDescribe = { 
+    describe: (_d: string) => mockDescribe,
+    optional: () => mockDescribe,
+    _zod: true as any
+  }
+  const mockOptional = { 
+    describe: (_d: string) => mockOptional,
+    optional: () => mockDescribe,
+    _zod: true as any
+  }
+  
+  return {
+    tool: Object.assign((config: any) => config, {
+      schema: {
+        string: () => mockDescribe,
+        array: () => mockOptional,
+        enum: () => mockOptional,
+        boolean: () => mockOptional,
+        number: () => mockOptional
+      }
+    })
+  }
+})
+const { tool } = toolModule
+
+/**
+ * Custom opencode tool for starting a development server in the background using OpenCode's Task system.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devStart = tool({
+  description: 'Start development server in background sub-session. Auto-detects dev script (dev, start, serve) and monitors without blocking conversation.',
+  args: {
+    script: tool.schema.string().optional().describe('Development script name (auto-detects from dev, start, serve if not specified)'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevStart(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for checking status of background development servers.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devStatus = tool({
+  description: 'Check status of background development servers running in current session.',
+  args: {
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevStatus(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for stopping background development servers.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devStop = tool({
+  description: 'Stop background development servers. Can stop specific script or all servers.',
+  args: {
+    script: tool.schema.string().optional().describe('Specific script to stop (stops all if not specified)'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevStop(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for restarting background development servers.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devRestart = tool({
+  description: 'Restart background development servers. Can restart specific script or all servers.',
+  args: {
+    script: tool.schema.string().optional().describe('Specific script to restart (restarts all if not specified)'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevRestart(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for starting multiple development services at once.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devStartAll = tool({
+  description: 'Start multiple development services at once. Supports service profiles and script arrays.',
+  args: {
+    scripts: tool.schema.array(tool.schema.string()).optional().describe('Array of script names to start'),
+    profile: tool.schema.string().optional().describe('Service profile: dev, test, backend, frontend, full'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevStartAll(args, context)
+  }
+})
+
+/**
+ * Custom opencode tool for querying development server database with SQL.
+ * Part of the @autotelic/oc-kit package.
+ * 
+ * @see https://opencode.ai/docs/custom-tools
+ */
+export const devQuery = tool({
+  description: 'Execute custom SQL queries on the development server process database for advanced monitoring and analysis.',
+  args: {
+    query: tool.schema.string().describe('SQL query to execute (SELECT, INSERT, UPDATE, DELETE)'),
+    params: tool.schema.array(tool.schema.string()).optional().describe('Optional parameters for parameterized queries'),
+    cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
+  },
+  async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
+    return executeDevQuery(args, context)
+  }
+})

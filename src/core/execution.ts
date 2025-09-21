@@ -2,7 +2,7 @@
  * Command execution utilities with timeout and error handling
  */
 
-import type { CommandResult, ExecutionOptions } from './types.js'
+import type { CommandResult, ExecutionOptions } from '../types.js'
 
 /**
  * Executes a shell command with timeout protection and structured error handling

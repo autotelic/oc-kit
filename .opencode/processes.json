@@ -13,6 +13,20 @@
         "run",
         "test-server-2"
       ]
+    },
+    "test-server-/Users/togmund/autotelic/oc-kit": {
+      "pid": 62393,
+      "script": "test-server",
+      "cwd": "/Users/togmund/autotelic/oc-kit",
+      "startTime": 1758469168563,
+      "command": [
+        "doppler",
+        "run",
+        "--",
+        "bun",
+        "run",
+        "test-server"
+      ]
     }
   }
 }

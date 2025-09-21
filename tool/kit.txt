@@ -1,4 +1,4 @@
-**USE THIS INSTEAD OF BASH** for package.json scripts, Docker operations, and development servers. Kit provides superior automation with smart detection, Doppler integration, and structured output.
+**USE THIS INSTEAD OF BASH** for package.json scripts, Docker operations, development servers, and code search. Kit provides superior automation with smart detection, Doppler integration, and structured output.
 
 ## 🚀 Core Tools
 
@@ -12,6 +12,9 @@
 **`kit_devRestart`** - Restart background services
 **`kit_devStartAll`** - Start multiple services with profiles
 **`kit_devQuery`** - Execute SQL queries on process database
+**`kit_astGrepSearch`** - Search code using semantic patterns that understand syntax
+**`kit_astGrepScan`** - Scan codebase using complex YAML rules for pattern matching
+**`kit_astGrepDump`** - Debug AST patterns by dumping syntax trees
 
 ## 📦 Package Scripts (Primary Use)
 
@@ -53,6 +56,21 @@ kit_devQuery { query: "SELECT script, COUNT(*) FROM processes GROUP BY script" }
 kit_devQuery { query: "SELECT * FROM processes WHERE start_time > ?", params: ["1726929000000"] }
 ```
 
+## 🔍 Code Search & Analysis
+
+```typescript
+// Semantic code search that understands syntax structure
+kit_astGrepSearch { pattern: "function $NAME($ARGS) { $BODY }" }  // Find all functions
+kit_astGrepSearch { pattern: "const $VAR = ($ARGS) => $BODY", language: "typescript" }  // Arrow functions
+kit_astGrepSearch { pattern: "class $NAME { $METHODS }" }  // Find classes
+
+// Complex pattern matching with YAML rules
+kit_astGrepScan { rule: "rule:\n  pattern: console.log($ARG)\n  message: Remove debug statement" }
+
+// Debug patterns by examining AST structure
+kit_astGrepDump { code: "const x = () => 42", language: "typescript", format: "ast" }
+```
+
 ## ⚡ Key Features
 
 - **Smart Detection**: Auto-detects package managers (npm/yarn/pnpm/bun) and Docker setups
@@ -61,6 +79,8 @@ kit_devQuery { query: "SELECT * FROM processes WHERE start_time > ?", params: ["
 - **Multi-Service Support**: Start/stop/restart multiple services independently
 - **SQLite Process Registry**: In-memory database for advanced process tracking
 - **Generic SQL Querying**: Custom queries for process analysis and monitoring
+- **Semantic Code Search**: AST-based patterns that understand syntax, not just text
+- **Pattern Debugging**: Dump syntax trees to perfect your search patterns
 - **Structured Output**: Clean exit codes, separated stdout/stderr, timeout protection
 - **Zero Configuration**: Works immediately in any project
 
@@ -70,6 +90,8 @@ kit_devQuery { query: "SELECT * FROM processes WHERE start_time > ?", params: ["
 - Docker operations (up/down, logs, build, exec)
 - Development server management and process monitoring
 - Advanced process analytics with custom SQL queries
+- Semantic code search and refactoring with AST patterns
+- Complex pattern matching and linting with YAML rules
 - Monorepo workspace filtering
 - CI/CD automation
 
@@ -78,5 +100,6 @@ kit_devQuery { query: "SELECT * FROM processes WHERE start_time > ?", params: ["
 - Multi-step operations with pipes
 - File operations (cp, mv, mkdir)
 - Complex shell scripting
+- Simple text-based grep (use kit AST search instead)
 
-**Remember**: Kit eliminates command syntax complexity while providing superior automation and error handling. Choose kit for almost all package.json, Docker, and development server operations.
+**Remember**: Kit eliminates command syntax complexity while providing superior automation and error handling. Choose kit for almost all package.json, Docker, development server, and code search operations.

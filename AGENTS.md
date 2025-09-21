@@ -2,6 +2,10 @@
 
 This is an Autotelic project that builds custom automation tools for opencode. The project provides smart alternatives to bash commands for package.json scripts and Docker operations.
 
+## 🚀 FUNDAMENTAL RULE: Always Use Kit Tools
+
+**THE SINGLE MOST IMPORTANT RULE**: Never use bash commands when kit tools are available. Kit tools provide superior automation, error handling, and integration. This project dogfoods its own tools to demonstrate best practices.
+
 ## Project Structure
 
 - `src/kit.ts` - Main source file containing all the custom tool implementations
@@ -49,6 +53,8 @@ The kit tools provide:
 - Smart Docker and Docker Compose operations
 - **Background development server management** with SQLite-based process registry
 - **Generic SQL querying** capability for advanced process monitoring
+- **AST-based code search** that understands syntax structure, not just text
+- **Semantic pattern matching** with metavariables for refactoring and analysis
 - Structured output with proper error handling
 - Timeout protection for long-running operations
 - **Bun-native APIs** throughout (Bun.spawn, Bun.file, bun:sqlite)
@@ -57,13 +63,24 @@ The kit tools provide:
 
 This project dogfoods its own tools. When working on this codebase:
 
-**IMPORTANT: Always prefer kit tools over bash commands for package.json scripts**
+**🚨 CRITICAL: ALWAYS use kit tools, NEVER use bash for package.json scripts**
 
-- Use `kit { script: "build" }` instead of `npm run build` or bash
-- Use `kit { script: "typecheck" }` instead of `npm run typecheck` or bash
-- Use `kit { script: "lint" }` instead of `npm run lint` or bash
-- Use `kit { script: "test" }` instead of `npm run test` or bash
-- Use `kit_list {}` to see all available scripts
+**Package.json Scripts (USE KIT, NOT BASH):**
+- ✅ `kit { script: "build" }` ❌ `npm run build` or bash
+- ✅ `kit { script: "typecheck" }` ❌ `npm run typecheck` or bash  
+- ✅ `kit { script: "lint" }` ❌ `npm run lint` or bash
+- ✅ `kit { script: "test" }` ❌ `npm run test` or bash
+- ✅ `kit_list {}` to see all available scripts
+
+**Code Search (USE KIT AST-GREP, NOT GREP):**
+- ✅ `kit_astGrepSearch { pattern: "function $NAME($ARGS) { $BODY }" }` ❌ `grep` or bash
+- ✅ `kit_astGrepScan { rule: "..." }` for complex pattern matching
+- ✅ `kit_astGrepDump { code: "...", language: "typescript" }` for debugging patterns
+
+**Docker Operations (USE KIT, NOT BASH):**
+- ✅ `kit_docker { action: "build", image: "myapp" }` ❌ `docker build` or bash
+- ✅ `kit_compose { action: "up", profile: "database" }` ❌ `docker-compose up` or bash
+- ✅ `kit_dockerList {}` to see available capabilities
 
 **Background Development Server Tools:**
 - Use `kit_devStart { script: "dev" }` to start servers in background

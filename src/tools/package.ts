@@ -21,6 +21,21 @@ const tool = await getOpenCodeTool()
 const DESCRIPTION = await Bun.file(`${import.meta.dir}/../../tool/kit.txt`).text()
 
 /**
+ * Converts a StreamingResult to CommandResult format for consistent formatting
+ * @param streamingResult - Result from streaming execution
+ * @returns CommandResult compatible object
+ */
+function streamingToCommandResult(streamingResult: any): any {
+  return {
+    command: streamingResult.command.split(' '), // Convert string back to array
+    exitCode: streamingResult.exitCode,
+    stdout: streamingResult.stdout,
+    stderr: streamingResult.stderr,
+    duration: undefined // Streaming doesn't track duration yet
+  }
+}
+
+/**
  * Executes a package.json script with package manager auto-detection and Doppler integration
  * @param args - Tool arguments containing script name and parameters
  * @param context - OpenCode context containing session information
@@ -91,14 +106,16 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
         onStderr
       })
 
-      return `Command: ${result.command}\nExit code: ${result.exitCode}\n\nFinal stdout:\n${result.stdout}\n\nFinal stderr:\n${result.stderr}`
+      // Convert streaming result to CommandResult format and use enhanced formatting
+      const commandResult = streamingToCommandResult(result)
+      return formatCommandResult(commandResult, args.script)
     } else {
       // Use regular execution for quick commands
       const result = await executeCommand(finalCommand, {
         cwd: workingDir
       })
 
-      return formatCommandResult(result)
+      return formatCommandResult(result, args.script)
     }
   } catch (error) {
     return `Error: ${(error as Error).message}`

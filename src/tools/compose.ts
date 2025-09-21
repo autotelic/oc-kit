@@ -28,6 +28,21 @@ import { getOpenCodeTool } from '../core/plugin-compat.js'
 import { resolveWorkingDirectory } from '../utils/common.js'
 
 /**
+ * Converts a StreamingResult to CommandResult format for consistent formatting
+ * @param streamingResult - Result from streaming execution
+ * @returns CommandResult compatible object
+ */
+function streamingToCommandResult(streamingResult: any): any {
+  return {
+    command: streamingResult.command.split(' '), // Convert string back to array
+    exitCode: streamingResult.exitCode,
+    stdout: streamingResult.stdout,
+    stderr: streamingResult.stderr,
+    duration: undefined // Streaming doesn't track duration yet
+  }
+}
+
+/**
  * Builds a Docker Compose command based on the provided arguments
  * @param args - Tool arguments containing action and parameters
  * @param capabilities - Docker capabilities for file and service resolution
@@ -184,7 +199,9 @@ export async function executeComposeCommand(args: ToolArgs, context: OpenCodeCon
       onStderr
     })
 
-    return `Command: ${result.command}\nExit code: ${result.exitCode}\n\nFinal stdout:\n${result.stdout}\n\nFinal stderr:\n${result.stderr}`
+    // Convert streaming result to CommandResult format and use enhanced formatting
+    const commandResult = streamingToCommandResult(result)
+    return formatCommandResult(commandResult, args.action)
   } else {
     // Use regular execution for quick commands
     const result = await executeCommand(finalCommand, {
@@ -192,7 +209,7 @@ export async function executeComposeCommand(args: ToolArgs, context: OpenCodeCon
       timeout
     })
 
-    return formatCommandResult(result)
+    return formatCommandResult(result, args.action)
   }
 }
 

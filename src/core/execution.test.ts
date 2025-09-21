@@ -20,13 +20,9 @@ describe('Command Result Formatting', () => {
 
     const formatted = formatCommandResult(result)
 
-    expect(formatted).toBe(
-      'Command: npm run test\n' +
-      'Exit code: 0\n\n' +
-      'Stdout:\n' +
-      'All tests passed\n\n' +
-      'Stderr:\n'
-    )
+    expect(formatted).toContain('✅ Command completed successfully')
+    expect(formatted).toContain('📄 Output:\nAll tests passed')
+    expect(formatted).not.toContain('🔧 Command:') // Should not show command details for success
   })
 
   test('formats failed command result', () => {
@@ -39,14 +35,11 @@ describe('Command Result Formatting', () => {
 
     const formatted = formatCommandResult(result)
 
-    expect(formatted).toBe(
-      'Command: npm run build\n' +
-      'Exit code: 1\n\n' +
-      'Stdout:\n' +
-      'Building...\n\n' +
-      'Stderr:\n' +
-      'Type error found'
-    )
+    expect(formatted).toContain('❌ Command failed')
+    expect(formatted).toContain('🔧 Command: npm run build')
+    expect(formatted).toContain('📉 Exit code: 1')
+    expect(formatted).toContain('📄 Stdout:\nBuilding...')
+    expect(formatted).toContain('❌ Error details:\nType error found')
   })
 
   test('formats command with complex arguments', () => {
@@ -59,9 +52,55 @@ describe('Command Result Formatting', () => {
 
     const formatted = formatCommandResult(result)
 
-    expect(formatted).toContain('Command: docker run --rm -it ubuntu:latest /bin/bash')
-    expect(formatted).toContain('Container output')
-    expect(formatted).toContain('Container warnings')
+    expect(formatted).toContain('✅ Command completed successfully')
+    expect(formatted).toContain('📄 Output:\nContainer output')
+    expect(formatted).toContain('⚠️  Warnings:\nContainer warnings')
+    expect(formatted).not.toContain('docker run --rm -it ubuntu:latest /bin/bash') // Command details not shown for success
+  })
+
+  test('formats result with script name context', () => {
+    const result: CommandResult = {
+      command: ['npm', 'run', 'test'],
+      exitCode: 0,
+      stdout: '15 tests passed',
+      stderr: '',
+      duration: 2500
+    }
+
+    const formatted = formatCommandResult(result, 'test')
+
+    expect(formatted).toContain('✅ test completed successfully (2.5s)')
+    expect(formatted).toContain('✅ 15 tests passed') // Context message for test script
+  })
+
+  test('formats result with timing information', () => {
+    const result: CommandResult = {
+      command: ['npm', 'run', 'build'],
+      exitCode: 0,
+      stdout: 'Build complete',
+      stderr: '',
+      duration: 15000
+    }
+
+    const formatted = formatCommandResult(result, 'build')
+
+    expect(formatted).toContain('✅ build completed successfully (15.0s)')
+    expect(formatted).toContain('🏗️  Build process completed') // Context message for build script
+  })
+
+  test('includes suggestions for failed commands', () => {
+    const result: CommandResult = {
+      command: ['npm', 'run', 'test'],
+      exitCode: 1,
+      stdout: '',
+      stderr: 'Module not found: cannot resolve dependency'
+    }
+
+    const formatted = formatCommandResult(result, 'test')
+
+    expect(formatted).toContain('❌ test failed')
+    expect(formatted).toContain('💡 Suggestions:')
+    expect(formatted).toContain('npm install') // Should suggest installing dependencies
   })
 })
 

@@ -104,6 +104,8 @@ export interface CommandResult {
   stdout: string
   /** Standard error output from the command */
   stderr: string
+  /** Duration of command execution in milliseconds */
+  duration?: number
 }
 
 /**

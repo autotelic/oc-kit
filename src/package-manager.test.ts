@@ -2,9 +2,6 @@
  * Tests for package manager detection and utilities
  */
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtemp, writeFile, rm } from 'fs/promises'
-import { join } from 'path'
-import { tmpdir } from 'os'
 import {
   detectPackageManager,
   getPackageJson,
@@ -17,39 +14,46 @@ describe('Package Manager Detection', () => {
   let testDir: string
 
   beforeEach(async () => {
-    testDir = await mkdtemp(join(tmpdir(), 'package-manager-test-'))
+    testDir = `${import.meta.dir}/../tmp/package-manager-test-${Date.now()}`
+    await Bun.write(`${testDir}/.keep`, '') // Create directory
   })
 
   afterEach(async () => {
-    await rm(testDir, { recursive: true, force: true })
+    if (testDir) {
+      try {
+        await Bun.spawn(['rm', '-rf', testDir]).exited
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
   })
 
   test('detects bun from bun.lock', async () => {
-    await writeFile(join(testDir, 'bun.lock'), '')
+    await Bun.write(`${testDir}/bun.lock`, '')
     const result = await detectPackageManager(testDir)
     expect(result).toBe('bun')
   })
 
   test('detects bun from bun.lockb', async () => {
-    await writeFile(join(testDir, 'bun.lockb'), '')
+    await Bun.write(`${testDir}/bun.lockb`, '')
     const result = await detectPackageManager(testDir)
     expect(result).toBe('bun')
   })
 
   test('detects pnpm from pnpm-lock.yaml', async () => {
-    await writeFile(join(testDir, 'pnpm-lock.yaml'), '')
+    await Bun.write(`${testDir}/pnpm-lock.yaml`, '')
     const result = await detectPackageManager(testDir)
     expect(result).toBe('pnpm')
   })
 
   test('detects yarn from yarn.lock', async () => {
-    await writeFile(join(testDir, 'yarn.lock'), '')
+    await Bun.write(`${testDir}/yarn.lock`, '')
     const result = await detectPackageManager(testDir)
     expect(result).toBe('yarn')
   })
 
   test('detects npm from package-lock.json', async () => {
-    await writeFile(join(testDir, 'package-lock.json'), '{}')
+    await Bun.write(`${testDir}/package-lock.json`, '{}')
     const result = await detectPackageManager(testDir)
     expect(result).toBe('npm')
   })
@@ -60,22 +64,22 @@ describe('Package Manager Detection', () => {
   })
 
   test('respects priority order (bun over pnpm)', async () => {
-    await writeFile(join(testDir, 'bun.lock'), '')
-    await writeFile(join(testDir, 'pnpm-lock.yaml'), '')
+    await Bun.write(`${testDir}/bun.lock`, '')
+    await Bun.write(`${testDir}/pnpm-lock.yaml`, '')
     const result = await detectPackageManager(testDir)
     expect(result).toBe('bun')
   })
 
   test('respects priority order (pnpm over yarn)', async () => {
-    await writeFile(join(testDir, 'pnpm-lock.yaml'), '')
-    await writeFile(join(testDir, 'yarn.lock'), '')
+    await Bun.write(`${testDir}/pnpm-lock.yaml`, '')
+    await Bun.write(`${testDir}/yarn.lock`, '')
     const result = await detectPackageManager(testDir)
     expect(result).toBe('pnpm')
   })
 
   test('respects priority order (yarn over npm)', async () => {
-    await writeFile(join(testDir, 'yarn.lock'), '')
-    await writeFile(join(testDir, 'package-lock.json'), '{}')
+    await Bun.write(`${testDir}/yarn.lock`, '')
+    await Bun.write(`${testDir}/package-lock.json`, '{}')
     const result = await detectPackageManager(testDir)
     expect(result).toBe('yarn')
   })
@@ -85,11 +89,18 @@ describe('Package.json Operations', () => {
   let testDir: string
 
   beforeEach(async () => {
-    testDir = await mkdtemp(join(tmpdir(), 'package-json-test-'))
+    testDir = `${import.meta.dir}/../tmp/package-json-test-${Date.now()}`
+    await Bun.write(`${testDir}/.keep`, '') // Create directory
   })
 
   afterEach(async () => {
-    await rm(testDir, { recursive: true, force: true })
+    if (testDir) {
+      try {
+        await Bun.spawn(['rm', '-rf', testDir]).exited
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
   })
 
   test('reads and parses package.json', async () => {
@@ -101,7 +112,7 @@ describe('Package.json Operations', () => {
         build: 'tsc'
       }
     }
-    await writeFile(join(testDir, 'package.json'), JSON.stringify(packageContent, null, 2))
+    await Bun.write(`${testDir}/package.json`, JSON.stringify(packageContent, null, 2))
 
     const result = await getPackageJson(testDir)
     expect(result).toEqual(packageContent)

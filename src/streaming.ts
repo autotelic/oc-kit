@@ -3,7 +3,7 @@
  * Provides live progress feedback instead of waiting for command completion
  */
 
-import { spawn, type SpawnOptionsWithoutStdio } from 'child_process'
+import type { Subprocess } from 'bun'
 
 /**
  * Result of streaming command execution
@@ -42,7 +42,7 @@ export interface StreamingOptions {
 }
 
 /**
- * Executes a command with real-time output streaming
+ * Executes a command with real-time output streaming using Bun.spawn
  * @param command - Command to execute
  * @param args - Command arguments
  * @param options - Streaming configuration options
@@ -68,52 +68,85 @@ export function executeWithStreaming(
     let stderr = ''
     let isTimedOut = false
 
-    const spawnOptions: SpawnOptionsWithoutStdio = {
-      cwd,
-      env: { ...process.env, ...env },
-      stdio: ['pipe', 'pipe', 'pipe']
-    }
-
     onProgress?.(`Starting: ${command} ${args.join(' ')}`)
 
-    const child = spawn(command, args, spawnOptions)
+    // Spawn process using Bun.spawn
+    const proc: Subprocess = Bun.spawn([command, ...args], {
+      cwd,
+      env: { ...process.env, ...env },
+      stdout: 'pipe',
+      stderr: 'pipe',
+      stdin: 'ignore',
+    })
 
     // Set up timeout if specified
     let timeoutId: NodeJS.Timeout | undefined
     if (timeout) {
       timeoutId = setTimeout(() => {
         isTimedOut = true
-        child.kill('SIGTERM')
+        proc.kill()
         
-        // Force kill after 5 seconds if SIGTERM doesn't work
+        // Force kill after 5 seconds if first kill doesn't work
         setTimeout(() => {
-          if (!child.killed) {
-            child.kill('SIGKILL')
+          if (proc.exitCode === null) {
+            proc.kill(9) // SIGKILL
           }
         }, 5000)
       }, timeout)
     }
 
-    // Handle stdout
-    child.stdout?.on('data', (data: Buffer) => {
-      const text = data.toString()
-      if (captureOutput) {
-        stdout += text
-      }
-      onStdout?.(text)
-    })
+    // Handle stdout streaming
+    if (proc.stdout && typeof proc.stdout !== 'number') {
+      const reader = proc.stdout.getReader()
+      const decoder = new TextDecoder()
+      
+      ;(async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            
+            const text = decoder.decode(value)
+            if (captureOutput) {
+              stdout += text
+            }
+            onStdout?.(text)
+          }
+        } catch {
+          // Reader failed, ignore
+        } finally {
+          reader.releaseLock()
+        }
+      })()
+    }
 
-    // Handle stderr
-    child.stderr?.on('data', (data: Buffer) => {
-      const text = data.toString()
-      if (captureOutput) {
-        stderr += text
-      }
-      onStderr?.(text)
-    })
+    // Handle stderr streaming
+    if (proc.stderr && typeof proc.stderr !== 'number') {
+      const reader = proc.stderr.getReader()
+      const decoder = new TextDecoder()
+      
+      ;(async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            
+            const text = decoder.decode(value)
+            if (captureOutput) {
+              stderr += text
+            }
+            onStderr?.(text)
+          }
+        } catch {
+          // Reader failed, ignore
+        } finally {
+          reader.releaseLock()
+        }
+      })()
+    }
 
-    // Handle process exit
-    child.on('close', (code, signal) => {
+    // Handle process completion
+    proc.exited.then((exitCode) => {
       if (timeoutId) {
         clearTimeout(timeoutId)
       }
@@ -124,29 +157,26 @@ export function executeWithStreaming(
         return
       }
 
-      const exitCode = code ?? (signal ? 1 : 0)
+      const finalExitCode = exitCode ?? 1
       
-      if (exitCode === 0) {
+      if (finalExitCode === 0) {
         onProgress?.('✅ Command completed successfully')
       } else {
-        onProgress?.(`❌ Command failed with exit code ${exitCode}`)
+        onProgress?.(`❌ Command failed with exit code ${finalExitCode}`)
       }
 
       resolve({
-        success: exitCode === 0,
-        exitCode,
+        success: finalExitCode === 0,
+        exitCode: finalExitCode,
         stdout: stdout.trim(),
         stderr: stderr.trim(),
         command: `${command} ${args.join(' ')}`
       })
-    })
-
-    // Handle spawn errors
-    child.on('error', (error) => {
+    }).catch((error) => {
       if (timeoutId) {
         clearTimeout(timeoutId)
       }
-      onProgress?.(`❌ Failed to start command: ${error.message}`)
+      onProgress?.(`❌ Failed to execute command: ${error.message}`)
       reject(error)
     })
   })

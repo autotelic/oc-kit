@@ -2,28 +2,32 @@
  * Tests for Doppler CLI integration utilities (simplified without global mocking)
  */
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtemp, writeFile, rm, mkdir } from 'fs/promises'
-import { join } from 'path'
-import { tmpdir } from 'os'
 
 describe('Doppler Integration Tests (No Mocking)', () => {
   let testDir: string
 
   beforeEach(async () => {
-    testDir = await mkdtemp(join(tmpdir(), 'doppler-simple-test-'))
+    testDir = await Bun.file('').name! // Use Bun's temp directory approach
+    testDir = `${import.meta.dir}/../tmp/doppler-test-${Date.now()}`
+    await Bun.write(`${testDir}/.keep`, '') // Create directory
   })
 
   afterEach(async () => {
     if (testDir) {
-      await rm(testDir, { recursive: true, force: true })
+      // Clean up test directory - Bun handles this better than fs/promises
+      try {
+        await Bun.spawn(['rm', '-rf', testDir]).exited
+      } catch {
+        // Ignore cleanup errors
+      }
     }
   })
 
   test('can create test directories and files', async () => {
     // Simple test to verify our test setup works
-    await writeFile(join(testDir, 'test-file.txt'), 'test content')
+    await Bun.write(`${testDir}/test-file.txt`, 'test content')
     
-    const file = Bun.file(join(testDir, 'test-file.txt'))
+    const file = Bun.file(`${testDir}/test-file.txt`)
     const content = await file.text()
     
     expect(content).toBe('test content')
@@ -31,12 +35,12 @@ describe('Doppler Integration Tests (No Mocking)', () => {
 
   test('can create doppler config structure', async () => {
     // Test creating the doppler config structure
-    await writeFile(join(testDir, 'doppler.yaml'), 'project: test\nconfig: dev\n')
-    await mkdir(join(testDir, '.doppler'))
-    await writeFile(join(testDir, '.doppler/cli.json'), '{"project":"test","config":"dev"}')
+    await Bun.write(`${testDir}/doppler.yaml`, 'project: test\nconfig: dev\n')
+    await Bun.write(`${testDir}/.doppler/.keep`, '') // Create .doppler directory
+    await Bun.write(`${testDir}/.doppler/cli.json`, '{"project":"test","config":"dev"}')
     
-    const yamlFile = Bun.file(join(testDir, 'doppler.yaml'))
-    const jsonFile = Bun.file(join(testDir, '.doppler/cli.json'))
+    const yamlFile = Bun.file(`${testDir}/doppler.yaml`)
+    const jsonFile = Bun.file(`${testDir}/.doppler/cli.json`)
     
     expect(await yamlFile.exists()).toBe(true)
     expect(await jsonFile.exists()).toBe(true)

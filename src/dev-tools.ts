@@ -3,71 +3,65 @@
  * True background process spawning within OpenCode sessions
  */
 
-import { spawn, ChildProcess } from 'child_process'
-import { join, dirname } from 'path'
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
+import { Database } from "bun:sqlite"
+import type { Subprocess } from 'bun'
 import type { ToolArgs, OpenCodeContext } from './types.js'
 import { getPackageJson, getScripts, detectPackageManager } from './package-manager.js'
 import { wrapWithDoppler } from './doppler.js'
 
-interface BackgroundProcess {
-  pid: number
+// In-memory SQLite database (session-scoped, no disk persistence)
+const db = new Database(":memory:")
+
+// Process registry table schema
+interface ProcessRow {
+  id: string
   script: string
   cwd: string
-  startTime: number
-  command: string[]
+  pid: number
+  start_time: number
+  command: string
 }
 
-interface ProcessRegistry {
-  processes: Record<string, BackgroundProcess>
-}
+// Initialize the database schema
+db.exec(`
+  CREATE TABLE IF NOT EXISTS processes (
+    id TEXT PRIMARY KEY,
+    script TEXT NOT NULL,
+    cwd TEXT NOT NULL,
+    pid INTEGER NOT NULL,
+    start_time INTEGER NOT NULL,
+    command TEXT NOT NULL
+  )
+`)
 
-/**
- * Get the process registry file path
- */
-function getRegistryPath(workingDir: string): string {
-  const ocDir = join(workingDir, '.opencode')
-  return join(ocDir, 'processes.json')
-}
+// Prepared statements for better performance
+const insertProcess = db.prepare(`
+  INSERT OR REPLACE INTO processes (id, script, cwd, pid, start_time, command)
+  VALUES (?, ?, ?, ?, ?, ?)
+`)
 
-/**
- * Load process registry
- */
-function loadRegistry(workingDir: string): ProcessRegistry {
-  const registryPath = getRegistryPath(workingDir)
-  
-  if (!existsSync(registryPath)) {
-    return { processes: {} }
-  }
-  
-  try {
-    const content = readFileSync(registryPath, 'utf-8')
-    return JSON.parse(content)
-  } catch {
-    return { processes: {} }
-  }
-}
+const getProcess = db.prepare(`
+  SELECT * FROM processes WHERE id = ?
+`)
 
-/**
- * Save process registry
- */
-function saveRegistry(workingDir: string, registry: ProcessRegistry): void {
-  const registryPath = getRegistryPath(workingDir)
-  const ocDir = dirname(registryPath)
-  
-  // Ensure .opencode directory exists
-  mkdirSync(ocDir, { recursive: true })
-  
-  writeFileSync(registryPath, JSON.stringify(registry, null, 2))
-}
+const getAllProcesses = db.prepare(`
+  SELECT * FROM processes ORDER BY start_time ASC
+`)
+
+const deleteProcess = db.prepare(`
+  DELETE FROM processes WHERE id = ?
+`)
+
+// In-memory process registry for storing actual Subprocess objects
+// SQLite stores metadata, Map stores the live process references
+const processObjects = new Map<string, Subprocess>()
 
 /**
  * Check if a process is still running
  */
-function isProcessRunning(pid: number): boolean {
+function isProcessRunning(proc: Subprocess): boolean {
   try {
-    process.kill(pid, 0) // Signal 0 checks if process exists
-    return true
+    return !proc.killed && proc.exitCode === null
   } catch {
     return false
   }
@@ -76,17 +70,72 @@ function isProcessRunning(pid: number): boolean {
 /**
  * Clean up dead processes from registry
  */
-function cleanupRegistry(workingDir: string): ProcessRegistry {
-  const registry = loadRegistry(workingDir)
+function cleanupRegistry(): void {
+  const allProcesses = getAllProcesses.all() as ProcessRow[]
   
-  for (const [key, proc] of Object.entries(registry.processes)) {
-    if (!isProcessRunning(proc.pid)) {
-      delete registry.processes[key]
+  for (const row of allProcesses) {
+    const proc = processObjects.get(row.id)
+    if (!proc || !isProcessRunning(proc)) {
+      deleteProcess.run(row.id)
+      processObjects.delete(row.id)
     }
   }
+}
+
+/**
+ * Get process key for registry
+ */
+function getProcessKey(script: string, cwd: string): string {
+  return `${script}-${cwd}`
+}
+
+/**
+ * Register a new process in the database and object map
+ */
+function registerProcess(script: string, cwd: string, proc: Subprocess, command: string[]): void {
+  const processKey = getProcessKey(script, cwd)
+  const startTime = Date.now()
   
-  saveRegistry(workingDir, registry)
-  return registry
+  // Store metadata in SQLite
+  insertProcess.run(
+    processKey,
+    script,
+    cwd,
+    proc.pid,
+    startTime,
+    JSON.stringify(command)
+  )
+  
+  // Store live process reference in Map
+  processObjects.set(processKey, proc)
+}
+
+/**
+ * Get a process from the registry
+ */
+function getRegisteredProcess(script: string, cwd: string): { row: ProcessRow; proc: Subprocess } | null {
+  const processKey = getProcessKey(script, cwd)
+  const row = getProcess.get(processKey) as ProcessRow | undefined
+  const proc = processObjects.get(processKey)
+  
+  if (row && proc) {
+    return { row, proc }
+  }
+  
+  // Clean up orphaned entries
+  if (row) deleteProcess.run(processKey)
+  if (proc) processObjects.delete(processKey)
+  
+  return null
+}
+
+/**
+ * Remove a process from the registry
+ */
+function unregisterProcess(script: string, cwd: string): void {
+  const processKey = getProcessKey(script, cwd)
+  deleteProcess.run(processKey)
+  processObjects.delete(processKey)
 }
 
 /**
@@ -101,7 +150,7 @@ export async function executeDevStart(args: ToolArgs, context: OpenCodeContext):
 
   try {
     // Clean up any dead processes first
-    const registry = cleanupRegistry(workingDir)
+    cleanupRegistry()
     
     // Auto-detect development script if not specified
     let devScript = args.script
@@ -127,15 +176,13 @@ export async function executeDevStart(args: ToolArgs, context: OpenCodeContext):
     }
 
     // Check if this script is already running
-    const processKey = `${devScript}-${workingDir}`
-    if (registry.processes[processKey]) {
-      const proc = registry.processes[processKey]
-      if (isProcessRunning(proc.pid)) {
-        return `Development server already running!\n\n**Script:** \`${devScript}\`\n**PID:** ${proc.pid}\n**Started:** ${new Date(proc.startTime).toLocaleTimeString()}\n**Working directory:** \`${workingDir}\``
-      } else {
-        // Clean up dead process
-        delete registry.processes[processKey]
-      }
+    const existingProcess = getRegisteredProcess(devScript, workingDir)
+    
+    if (existingProcess && isProcessRunning(existingProcess.proc)) {
+      return `Development server already running!\n\n**Script:** \`${devScript}\`\n**PID:** ${existingProcess.proc.pid}\n**Started:** ${new Date(existingProcess.row.start_time).toLocaleTimeString()}\n**Working directory:** \`${workingDir}\``
+    } else if (existingProcess) {
+      // Clean up dead process
+      unregisterProcess(devScript, workingDir)
     }
 
     // Detect package manager and build command
@@ -146,28 +193,20 @@ export async function executeDevStart(args: ToolArgs, context: OpenCodeContext):
     const wrappedCommand = await wrapWithDoppler(command, workingDir, false)
     command = wrappedCommand
 
-    // Spawn the process in background
-    const child: ChildProcess = spawn(command[0]!, command.slice(1), {
+    // Spawn the process in background using Bun.spawn
+    const proc = Bun.spawn(command, {
       cwd: workingDir,
-      detached: false, // Keep as part of this session
-      stdio: ['ignore', 'pipe', 'pipe'], // Capture output for monitoring
+      stdout: 'pipe',
+      stderr: 'pipe',
+      stdin: 'ignore',
     })
 
-    if (!child.pid) {
+    if (!proc.pid) {
       return `Failed to start development server process`
     }
 
     // Register the process
-    const backgroundProcess: BackgroundProcess = {
-      pid: child.pid,
-      script: devScript,
-      cwd: workingDir,
-      startTime: Date.now(),
-      command
-    }
-
-    registry.processes[processKey] = backgroundProcess
-    saveRegistry(workingDir, registry)
+    registerProcess(devScript, workingDir, proc, command)
 
     // Set up basic monitoring (non-blocking)
     let startupOutput = ''
@@ -179,40 +218,46 @@ export async function executeDevStart(args: ToolArgs, context: OpenCodeContext):
       }
     }, 3000) // Give it 3 seconds to show startup output
 
-    if (child.stdout) {
-      child.stdout.on('data', (data) => {
-        if (!hasStarted) {
-          startupOutput += data.toString()
-          // Look for common success indicators
-          const output = startupOutput.toLowerCase()
-          if (output.includes('server') && (output.includes('running') || output.includes('listening') || output.includes('started'))) {
-            hasStarted = true
-            clearTimeout(timeout)
+    // Monitor stdout for startup indicators
+    if (proc.stdout) {
+      const reader = proc.stdout.getReader()
+      const decoder = new TextDecoder()
+      
+      ;(async () => {
+        try {
+          while (!hasStarted) {
+            const { done, value } = await reader.read()
+            if (done) break
+            
+            const text = decoder.decode(value)
+            startupOutput += text
+            
+            // Look for common success indicators
+            const output = startupOutput.toLowerCase()
+            if (output.includes('server') && (output.includes('running') || output.includes('listening') || output.includes('started'))) {
+              hasStarted = true
+              clearTimeout(timeout)
+              break
+            }
           }
+        } catch {
+          // Reader failed, ignore
+        } finally {
+          reader.releaseLock()
         }
-      })
-    }
-
-    if (child.stderr) {
-      child.stderr.on('data', (data) => {
-        if (!hasStarted) {
-          startupOutput += data.toString()
-        }
-      })
+      })()
     }
 
     // Handle process exit
-    child.on('exit', (_code) => {
-      const currentRegistry = loadRegistry(workingDir)
-      delete currentRegistry.processes[processKey]
-      saveRegistry(workingDir, currentRegistry)
+    proc.exited.then(() => {
+      unregisterProcess(devScript, workingDir)
     })
 
     // Return immediately - this is the key to non-blocking behavior
     return `🚀 **Development Server Started**
 
 **Script:** \`${devScript}\`
-**PID:** ${child.pid}
+**PID:** ${proc.pid}
 **Command:** \`${command.join(' ')}\`
 **Working directory:** \`${workingDir}\`
 
@@ -234,24 +279,27 @@ export async function executeDevStatus(args: ToolArgs, context: OpenCodeContext)
   const workingDir = args.cwd || context.cwd || process.cwd()
   
   try {
-    const registry = cleanupRegistry(workingDir)
-    const processes = Object.values(registry.processes)
+    cleanupRegistry()
+    const allProcesses = getAllProcesses.all() as ProcessRow[]
     
-    if (processes.length === 0) {
+    if (allProcesses.length === 0) {
       return `No development servers currently running in \`${workingDir}\``
     }
     
     let output = `**Development Servers Status**\n\n`
     
-    for (const proc of processes) {
-      const uptime = Math.floor((Date.now() - proc.startTime) / 1000)
-      const uptimeStr = uptime > 60 ? `${Math.floor(uptime/60)}m ${uptime%60}s` : `${uptime}s`
-      
-      output += `**${proc.script}**\n`
-      output += `- PID: ${proc.pid}\n`
-      output += `- Uptime: ${uptimeStr}\n`
-      output += `- Command: \`${proc.command.join(' ')}\`\n`
-      output += `- Directory: \`${proc.cwd}\`\n\n`
+    for (const row of allProcesses) {
+      const proc = processObjects.get(row.id)
+      if (proc && isProcessRunning(proc)) {
+        const uptime = Math.floor((Date.now() - row.start_time) / 1000)
+        const uptimeStr = uptime > 60 ? `${Math.floor(uptime/60)}m ${uptime%60}s` : `${uptime}s`
+        
+        output += `**${row.script}**\n`
+        output += `- PID: ${row.pid}\n`
+        output += `- Uptime: ${uptimeStr}\n`
+        output += `- Command: \`${JSON.parse(row.command).join(' ')}\`\n`
+        output += `- Directory: \`${row.cwd}\`\n\n`
+      }
     }
     
     return output.trim()
@@ -268,43 +316,36 @@ export async function executeDevStop(args: ToolArgs, context: OpenCodeContext): 
   const workingDir = args.cwd || context.cwd || process.cwd()
   
   try {
-    const registry = cleanupRegistry(workingDir)
-    const processes = Object.values(registry.processes)
+    cleanupRegistry()
+    const allProcesses = getAllProcesses.all() as ProcessRow[]
     
-    if (processes.length === 0) {
+    if (allProcesses.length === 0) {
       return `No development servers currently running in \`${workingDir}\``
     }
     
     // If script specified, stop only that script
     if (args.script) {
-      const processKey = `${args.script}-${workingDir}`
-      const proc = registry.processes[processKey]
+      const existingProcess = getRegisteredProcess(args.script, workingDir)
       
-      if (!proc) {
-        const availableScripts = Object.values(registry.processes).map(p => p.script)
+      if (!existingProcess) {
+        const availableScripts = allProcesses.map(p => p.script)
         return `No server running for script \`${args.script}\`. Running servers: ${availableScripts.join(', ')}`
       }
       
-      if (!isProcessRunning(proc.pid)) {
-        delete registry.processes[processKey]
-        saveRegistry(workingDir, registry)
+      if (!isProcessRunning(existingProcess.proc)) {
+        unregisterProcess(args.script, workingDir)
         return `Server for \`${args.script}\` was already stopped (cleaned up dead process)`
       }
       
       try {
-        process.kill(proc.pid, 'SIGTERM')
-        // Give it a moment to gracefully shutdown
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        existingProcess.proc.kill()
         
-        // If still running, force kill
-        if (isProcessRunning(proc.pid)) {
-          process.kill(proc.pid, 'SIGKILL')
-        }
+        // Wait for graceful shutdown
+        await existingProcess.proc.exited
         
-        delete registry.processes[processKey]
-        saveRegistry(workingDir, registry)
+        unregisterProcess(args.script, workingDir)
         
-        return `✅ Stopped development server: \`${args.script}\` (PID: ${proc.pid})`
+        return `✅ Stopped development server: \`${args.script}\` (PID: ${existingProcess.proc.pid})`
         
       } catch (error) {
         return `Error stopping server \`${args.script}\`: ${(error as Error).message}`
@@ -315,15 +356,18 @@ export async function executeDevStop(args: ToolArgs, context: OpenCodeContext): 
     let stoppedCount = 0
     let errors: string[] = []
     
-    for (const [processKey, proc] of Object.entries(registry.processes)) {
-      try {
-        if (isProcessRunning(proc.pid)) {
-          process.kill(proc.pid, 'SIGTERM')
-          stoppedCount++
+    for (const row of allProcesses) {
+      const proc = processObjects.get(row.id)
+      if (proc) {
+        try {
+          if (isProcessRunning(proc)) {
+            proc.kill()
+            stoppedCount++
+          }
+          unregisterProcess(row.script, row.cwd)
+        } catch (error) {
+          errors.push(`${row.script}: ${(error as Error).message}`)
         }
-        delete registry.processes[processKey]
-      } catch (error) {
-        errors.push(`${proc.script}: ${(error as Error).message}`)
       }
     }
     
@@ -331,17 +375,18 @@ export async function executeDevStop(args: ToolArgs, context: OpenCodeContext): 
     await new Promise(resolve => setTimeout(resolve, 1500))
     
     // Force kill any remaining processes
-    for (const proc of processes) {
-      try {
-        if (isProcessRunning(proc.pid)) {
-          process.kill(proc.pid, 'SIGKILL')
+    for (const row of allProcesses) {
+      const proc = processObjects.get(row.id)
+      if (proc) {
+        try {
+          if (isProcessRunning(proc)) {
+            proc.kill(9) // SIGKILL
+          }
+        } catch {
+          // Process already gone, ignore
         }
-      } catch {
-        // Process already gone, ignore
       }
     }
-    
-    saveRegistry(workingDir, registry)
     
     let result = `✅ Stopped ${stoppedCount} development server(s)`
     if (errors.length > 0) {
@@ -362,14 +407,13 @@ export async function executeDevRestart(args: ToolArgs, context: OpenCodeContext
   const workingDir = args.cwd || context.cwd || process.cwd()
   
   try {
-    const registry = cleanupRegistry(workingDir)
+    cleanupRegistry()
     
     // If script specified, restart only that script
     if (args.script) {
-      const processKey = `${args.script}-${workingDir}`
-      const proc = registry.processes[processKey]
+      const existingProcess = getRegisteredProcess(args.script, workingDir)
       
-      if (!proc) {
+      if (!existingProcess) {
         // Script not running, just start it
         return await executeDevStart(args, context)
       }
@@ -390,14 +434,14 @@ export async function executeDevRestart(args: ToolArgs, context: OpenCodeContext
     }
     
     // Restart all servers
-    const processes = Object.values(registry.processes)
+    const allProcesses = getAllProcesses.all() as ProcessRow[]
     
-    if (processes.length === 0) {
+    if (allProcesses.length === 0) {
       return `No development servers currently running in \`${workingDir}\` to restart`
     }
     
     // Remember what was running
-    const scriptsToRestart = processes.map(p => p.script)
+    const scriptsToRestart = allProcesses.map(p => p.script)
     
     // Stop all
     const stopResult = await executeDevStop(args, context)

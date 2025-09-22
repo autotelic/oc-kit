@@ -143,8 +143,7 @@ export async function discoverWorkspaces(rootDir: string): Promise<WorkspaceInfo
             name: packageJson.name as string | undefined
           })
         } catch (error) {
-          // Skip invalid package.json files
-          console.warn(`Warning: Could not parse package.json in ${currentDir}:`, error)
+          // Skip invalid package.json files - silent failure for workspace discovery
         }
       }
       
@@ -153,8 +152,7 @@ export async function discoverWorkspaces(rootDir: string): Promise<WorkspaceInfo
         await searchDirectory(subdir)
       }
     } catch (error) {
-      // Skip directories we can't read
-      console.warn(`Warning: Could not read directory ${currentDir}:`, error)
+      // Skip directories we can't read - silent failure for workspace discovery
     }
   }
   

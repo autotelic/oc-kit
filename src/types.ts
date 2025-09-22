@@ -34,6 +34,8 @@ export interface ToolArgs {
   skipDoppler?: boolean
   /** Specific workspace path/name to target for monorepo operations */
   workspace?: string
+  /** Force execution without dev server detection and recommendations */
+  force?: boolean
   /** Docker/Compose action to perform */
   action?: string
   /** Docker image name for build/run/pull/push operations */
@@ -138,4 +140,47 @@ export interface ExecutionOptions {
   cwd: string
   /** Command timeout in milliseconds */
   timeout?: number
+}
+
+/**
+ * Structured result type for tool operations
+ */
+export interface ToolResult<T = any> {
+  /** Whether the operation succeeded */
+  success: boolean
+  /** Result data if successful */
+  data?: T
+  /** Error message if operation failed */
+  error?: string
+  /** Additional context or metadata */
+  context?: Record<string, any>
+}
+
+/**
+ * Helper function to create a successful tool result
+ */
+export function success<T>(data: T, context?: Record<string, any>): ToolResult<T> {
+  const result: ToolResult<T> = { success: true, data }
+  if (context) result.context = context
+  return result
+}
+
+/**
+ * Helper function to create a failed tool result
+ */
+export function failure(error: string, context?: Record<string, any>): ToolResult<never> {
+  const result: ToolResult<never> = { success: false, error }
+  if (context) result.context = context
+  return result
+}
+
+/**
+ * Helper function to format a tool result as a string response
+ */
+export function formatToolResult<T>(result: ToolResult<T>): string {
+  if (result.success) {
+    return typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2)
+  } else {
+    return `Error: ${result.error}`
+  }
 }

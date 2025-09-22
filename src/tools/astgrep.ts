@@ -250,21 +250,11 @@ export const astGrepDump = tool({
       const tempFile = `${workingDir}/.ast-grep-temp-code.${args.language === 'typescript' ? 'ts' : args.language === 'javascript' ? 'js' : 'txt'}`
       await Bun.write(tempFile, args.code)
 
-      // Build ast-grep command
-      const astGrepArgs = ['ast-grep', 'scan', '--rule']
-      
-      // Create a simple rule that matches everything to trigger AST dump
-      const dumpRule = `
-id: dump-rule
-language: ${args.language}
-rule:
-  pattern: $$$
-`
-      const tempRuleFile = `${workingDir}/.ast-grep-temp-dump-rule.yml`
-      await Bun.write(tempRuleFile, dumpRule)
-      
-      astGrepArgs.push(tempRuleFile)
-      astGrepArgs.push('--debug-query', args.format || 'ast')
+      // Build ast-grep command using 'run' subcommand for debug-query support
+      const astGrepArgs = ['ast-grep', 'run']
+      astGrepArgs.push('--pattern', '$$$') // Pattern that matches everything
+      astGrepArgs.push('--lang', args.language)
+      astGrepArgs.push('--debug-query=' + (args.format || 'ast'))
       astGrepArgs.push(tempFile)
 
       const result = await executeCommand(astGrepArgs, {
@@ -272,10 +262,9 @@ rule:
         timeout: 10000 // 10 seconds for syntax dump
       })
 
-      // Clean up temporary files
+      // Clean up temporary file
       try {
         await Bun.write(tempFile, '')
-        await Bun.write(tempRuleFile, '')
       } catch {
         // Ignore cleanup errors
       }

@@ -11,7 +11,7 @@ import { validateScriptName, validateArgumentArray } from '../core/security-vali
 import { checkScriptGuardrails, DEFAULT_SECURITY_CONFIG } from '../core/security-guardrails.js'
 import { executeWithStreaming, shouldUseStreaming, isDevServerScript, createProgressLogger, createOutputStreamers } from '../core/streaming.js'
 import { getOpenCodeTool } from '../core/plugin-compat.js'
-import { resolveWorkingDirectory } from '../utils/common.js'
+import { resolveWorkingDirectory, areDevToolsAvailable } from '../utils/common.js'
 
 // OpenCode plugin compatibility layer
 const tool = await getOpenCodeTool()
@@ -31,6 +31,56 @@ function streamingToCommandResult(streamingResult: any): any {
     stdout: streamingResult.stdout,
     stderr: streamingResult.stderr,
     duration: undefined // Streaming doesn't track duration yet
+  }
+}
+
+/**
+ * Executes a dev server with appropriate warnings and timeout handling
+ * @param command - Command to execute
+ * @param commandArgs - Command arguments
+ * @param executionDir - Directory to execute in
+ * @param targetWorkspace - Target workspace info
+ * @param scriptName - Name of the script being executed
+ * @returns Promise resolving to formatted command result
+ */
+async function executeDevServerWithWarning(
+  command: string,
+  commandArgs: string[],
+  executionDir: string,
+  targetWorkspace: any,
+  scriptName: string
+): Promise<string> {
+  const useStreaming = shouldUseStreaming(command, commandArgs)
+
+  if (useStreaming) {
+    // Use streaming execution with longer timeout for dev servers
+    const progressLogger = createProgressLogger('📦')
+    const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
+
+    const result = await executeWithStreaming(command, commandArgs, {
+      cwd: executionDir,
+      timeout: 30000, // 30 seconds timeout for dev servers
+      onProgress: progressLogger,
+      onStdout,
+      onStderr
+    })
+
+    // Convert streaming result to CommandResult format and use enhanced formatting
+    const commandResult = streamingToCommandResult(result)
+    const workspaceNote = targetWorkspace.relativePath !== '.' 
+      ? ` (workspace: ${targetWorkspace.name || targetWorkspace.relativePath})`
+      : ''
+    return formatCommandResult(commandResult, `${scriptName}${workspaceNote}`)
+  } else {
+    // Use regular execution for quick commands
+    const result = await executeCommand([command, ...commandArgs], {
+      cwd: executionDir
+    })
+
+    const workspaceNote = targetWorkspace.relativePath !== '.' 
+      ? ` (workspace: ${targetWorkspace.name || targetWorkspace.relativePath})`
+      : ''
+    return formatCommandResult(result, `${scriptName}${workspaceNote}`)
   }
 }
 
@@ -153,17 +203,27 @@ export async function executePackageScript(args: ToolArgs, context: OpenCodeCont
     const useStreaming = shouldUseStreaming(command, commandArgs)
     const isDevServer = isDevServerScript(command, commandArgs)
 
-    // For dev servers, suggest using kit_devStart instead
-    if (isDevServer) {
+    // For dev servers, check if dev tools are available and handle intelligently
+    // Skip this logic if force flag is set
+    if (isDevServer && !args.force) {
+      const devToolsAvailable = await areDevToolsAvailable()
       const workspaceParam = targetWorkspace.relativePath !== '.' 
         ? `, workspace: "${targetWorkspace.name || targetWorkspace.relativePath}"` 
         : ''
       
-      return `💡 Dev server detected! For long-running dev servers, use kit_devStart instead:
+      if (devToolsAvailable) {
+        // If dev tools are available, recommend using kit_devStart
+        return `💡 Dev server detected! For long-running dev servers, use kit_devStart instead:
 
   kit_devStart { script: "${args.script}"${workspaceParam} }
 
-This runs the server in the background without blocking your session. Use kit_devStatus to monitor it.`
+This runs the server in the background without blocking your session. Use kit_devStatus to monitor it.
+
+If you prefer to run it in the foreground anyway, add --force flag to kit_run.`
+      } else {
+        // If dev tools are not available, continue with regular execution but with a longer timeout for dev servers
+        return await executeDevServerWithWarning(command, commandArgs, executionDir, targetWorkspace, args.script)
+      }
     }
 
     if (useStreaming) {
@@ -272,7 +332,8 @@ export const run = tool({
     cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)'),
     packageManager: tool.schema.enum(['npm', 'yarn', 'pnpm', 'bun']).optional().describe('Package manager to use (auto-detected if not specified)'),
     skipDoppler: tool.schema.boolean().optional().describe('Skip automatic Doppler wrapping (default: false)'),
-    workspace: tool.schema.string().optional().describe('Specific workspace path to run the script in (auto-detected if not specified)')
+    workspace: tool.schema.string().optional().describe('Specific workspace path to run the script in (auto-detected if not specified)'),
+    force: tool.schema.boolean().optional().describe('Force execution without dev server detection and recommendations')
   },
   async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
     return executePackageScript(args, context)

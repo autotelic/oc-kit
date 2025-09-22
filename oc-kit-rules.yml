@@ -1,8 +1,8 @@
 rules:
   # === DOCUMENTATION PATTERNS ===
-  
+
   - id: missing-jsdoc-functions
-    message: "Function missing JSDoc documentation"
+    message: 'Function missing JSDoc documentation'
     severity: warning
     language: typescript
     rule:
@@ -16,10 +16,10 @@ rules:
             /**
              * $$$DOC
              */
-    note: "Add JSDoc documentation for better maintainability"
+    note: 'Add JSDoc documentation for better maintainability'
 
   - id: missing-jsdoc-export-functions
-    message: "Exported function missing JSDoc documentation"
+    message: 'Exported function missing JSDoc documentation'
     severity: error
     language: typescript
     rule:
@@ -33,12 +33,12 @@ rules:
             /**
              * $$$DOC
              */
-    note: "Public functions must have JSDoc documentation"
+    note: 'Public functions must have JSDoc documentation'
 
   # === ARCHITECTURE PATTERNS ===
-  
+
   - id: tool-export-complete
-    message: "Complete tool export pattern detected"
+    message: 'Complete tool export pattern detected'
     severity: info
     language: typescript
     rule:
@@ -52,18 +52,18 @@ rules:
             $$$BODY
           }
         })
-    note: "Standard kit tool export pattern - well structured"
+    note: 'Standard kit tool export pattern - well structured'
 
   - id: working-directory-pattern
-    message: "Proper working directory resolution"
+    message: 'Proper working directory resolution'
     severity: info
     language: typescript
     rule:
       pattern: resolveWorkingDirectory(args, context)
-    note: "Good practice: using context-aware working directory resolution"
+    note: 'Good practice: using context-aware working directory resolution'
 
   - id: bun-api-usage
-    message: "Bun native API usage"
+    message: 'Bun native API usage'
     severity: info
     language: typescript
     rule:
@@ -72,12 +72,12 @@ rules:
         - pattern: Bun.file($$$)
         - pattern: Bun.resolveSync($$$)
         - pattern: Bun.write($$$)
-    note: "Using Bun native APIs for performance"
+    note: 'Using Bun native APIs for performance'
 
   # === SECURITY PATTERNS ===
 
   - id: security-validation-required
-    message: "Security validation should be applied"
+    message: 'Security validation should be applied'
     severity: warning
     language: typescript
     rule:
@@ -101,10 +101,10 @@ rules:
           - pattern: validateScriptName($$$)
           - pattern: validateArgumentArray($$$)
           - pattern: checkScriptGuardrails($$$)
-    note: "Consider adding security validation for script parameters"
+    note: 'Consider adding security validation for script parameters'
 
   - id: security-validation-good
-    message: "Security validation properly implemented"
+    message: 'Security validation properly implemented'
     severity: info
     language: typescript
     rule:
@@ -112,10 +112,10 @@ rules:
         - pattern: validateScriptName($SCRIPT)
         - pattern: validateArgumentArray($ARGS)
         - pattern: checkScriptGuardrails($SCRIPT, $CONFIG)
-    note: "Good practice: security validation in use"
+    note: 'Good practice: security validation in use'
 
   - id: command-injection-risk
-    message: "Potential command injection - ensure proper validation"
+    message: 'Potential command injection - ensure proper validation'
     severity: warning
     language: typescript
     rule:
@@ -124,13 +124,69 @@ rules:
     constraints:
       CMD:
         not:
-          regex: "^['\"`][a-zA-Z0-9-_]+['\"`]$"
-    note: "Ensure command is properly validated/sanitized"
+          regex: '^[''"`][a-zA-Z0-9-_]+[''"`]$'
+    note: 'Ensure command is properly validated/sanitized'
 
-  # === ERROR HANDLING PATTERNS ===
+    # === ERROR HANDLING PATTERNS ===
+
+  - id: empty-catch-block
+    message: 'Empty catch block - errors should be surfaced in tool response'
+    severity: error
+    language: typescript
+    rule:
+      pattern: |
+        } catch ($ERR) {
+        }
+    note: 'Empty catch blocks hide errors from users. Return structured error responses instead.'
+
+  - id: empty-catch-block-unnamed
+    message: 'Empty catch block without parameter - errors should be surfaced'
+    severity: error
+    language: typescript
+    rule:
+      pattern: |
+        } catch {
+        }
+    note: 'Catch block should handle errors and return them in tool response'
+
+  - id: silent-return-in-catch
+    message: 'Silent return in catch block - surface error to user'
+    severity: warning
+    language: typescript
+    rule:
+      pattern: |
+        } catch ($ERR) {
+          return $FALLBACK
+        }
+    constraints:
+      FALLBACK:
+        not:
+          regex: '.*Error.*'
+    note: 'Consider returning error information instead of silent fallback values'
+
+  - id: console-log-in-catch
+    message: 'Console.log in catch block - return error in response instead'
+    severity: error
+    language: typescript
+    rule:
+      pattern: |
+        } catch ($ERR) {
+          console.log($$$)
+          $$$
+        }
+    note: "Don't log errors to console - return them in structured tool response"
+
+  - id: proper-error-response
+    message: 'Good error handling - structured error response'
+    severity: info
+    language: typescript
+    rule:
+      pattern: |
+        return `Error: ${($ERR as Error).message}`
+    note: 'Good practice: returning error information to user'
 
   - id: missing-error-handling
-    message: "Missing error handling for async operations"
+    message: 'Missing error handling for async operations'
     severity: warning
     language: typescript
     rule:
@@ -152,21 +208,21 @@ rules:
                 } catch ($ERR) {
                   return `Error: ${($ERR as Error).message}`
                 }
-    note: "Consider adding try-catch for error handling"
+    note: 'Consider adding try-catch for error handling'
 
   - id: proper-error-formatting
-    message: "Proper error formatting pattern"
+    message: 'Proper error formatting pattern'
     severity: info
     language: typescript
     rule:
       pattern: |
         return `Error: ${($ERR as Error).message}`
-    note: "Good practice: consistent error message formatting"
+    note: 'Good practice: consistent error message formatting'
 
   # === OPENCODE TOOL PATTERNS ===
 
   - id: missing-tool-description
-    message: "Tool export missing proper description"
+    message: 'Tool export missing proper description'
     severity: warning
     language: typescript
     rule:
@@ -177,11 +233,11 @@ rules:
         })
     constraints:
       DESC:
-        regex: "^['\"`][a-zA-Z ]{0,20}['\"`]$"
-    note: "Tool descriptions should be descriptive (>20 chars) for better UX"
+        regex: '^[''"`][a-zA-Z ]{0,20}[''"`]$'
+    note: 'Tool descriptions should be descriptive (>20 chars) for better UX'
 
   - id: execute-function-pattern
-    message: "Standard execute function signature"
+    message: 'Standard execute function signature'
     severity: info
     language: typescript
     rule:
@@ -189,30 +245,30 @@ rules:
         async execute(args: ToolArgs, context: OpenCodeContext): Promise<string> {
           $$$
         }
-    note: "Standard opencode tool execute function signature"
+    note: 'Standard opencode tool execute function signature'
 
   # === IMPORT PATTERNS ===
 
   - id: relative-import-from-core
-    message: "Core module import detected"
+    message: 'Core module import detected'
     severity: info
     language: typescript
     rule:
       pattern: |
         import { $$$IMPORTS } from '../core/$MODULE.js'
-    note: "Importing from core modules - good architecture"
+    note: 'Importing from core modules - good architecture'
 
   - id: relative-import-from-utils
-    message: "Utility module import detected"
+    message: 'Utility module import detected'
     severity: info
     language: typescript
     rule:
       pattern: |
         import { $$$IMPORTS } from '../utils/$MODULE.js'
-    note: "Importing from utility modules"
+    note: 'Importing from utility modules'
 
   - id: bun-test-import
-    message: "Bun test framework usage"
+    message: 'Bun test framework usage'
     severity: info
     language: typescript
     rule:
@@ -223,7 +279,7 @@ rules:
   # === PERFORMANCE PATTERNS ===
 
   - id: streaming-execution
-    message: "Streaming execution for long-running commands"
+    message: 'Streaming execution for long-running commands'
     severity: info
     language: typescript
     rule:
@@ -231,10 +287,10 @@ rules:
         - pattern: executeWithStreaming($$$)
         - pattern: shouldUseStreaming($$$)
         - pattern: createProgressLogger($$$)
-    note: "Good practice: streaming for better UX on long operations"
+    note: 'Good practice: streaming for better UX on long operations'
 
   - id: timeout-configuration
-    message: "Timeout properly configured"
+    message: 'Timeout properly configured'
     severity: info
     language: typescript
     rule:
@@ -245,57 +301,57 @@ rules:
         executeCommand($$$, {
           $$$
         })
-    note: "Good practice: timeout configuration for command execution"
+    note: 'Good practice: timeout configuration for command execution'
 
   # === DOPPLER INTEGRATION ===
 
   - id: doppler-integration
-    message: "Doppler integration for environment variables"
+    message: 'Doppler integration for environment variables'
     severity: info
     language: typescript
     rule:
       pattern: wrapWithDoppler($$$)
-    note: "Good practice: using Doppler for secure env var management"
+    note: 'Good practice: using Doppler for secure env var management'
 
   - id: skip-doppler-option
-    message: "Skip Doppler option available"
+    message: 'Skip Doppler option available'
     severity: info
     language: typescript
     rule:
       pattern: skipDoppler
-    note: "Flexibility: allowing users to skip Doppler if needed"
+    note: 'Flexibility: allowing users to skip Doppler if needed'
 
   # === TYPE SAFETY PATTERNS ===
 
   - id: type-assertion-as-error
-    message: "Type assertion for error handling"
+    message: 'Type assertion for error handling'
     severity: info
     language: typescript
     rule:
       pattern: ($ERR as Error)
-    note: "Type safety: proper error type assertion"
+    note: 'Type safety: proper error type assertion'
 
   - id: toolargs-context-params
-    message: "Standard tool parameter pattern"
+    message: 'Standard tool parameter pattern'
     severity: info
     language: typescript
     rule:
       pattern: |
         (args: ToolArgs, context: OpenCodeContext)
-    note: "Standard parameter pattern for kit tools"
+    note: 'Standard parameter pattern for kit tools'
 
   # === CODE SMELLS & REFACTORING ===
 
   - id: eslint-disable-inconsistent
-    message: "Inconsistent eslint-disable usage"
+    message: 'Inconsistent eslint-disable usage'
     severity: warning
     language: typescript
     rule:
       pattern: // eslint-disable-next-line no-undef
-    note: "Consider proper TypeScript configuration instead of disabling eslint rules"
+    note: 'Consider proper TypeScript configuration instead of disabling eslint rules'
 
   - id: complex-if-else-chain
-    message: "Complex if-else chain - consider refactoring"
+    message: 'Complex if-else chain - consider refactoring'
     severity: warning
     language: typescript
     rule:
@@ -307,10 +363,10 @@ rules:
         } else {
           $$$ELSE
         }
-    note: "Consider extracting to separate functions or using strategy pattern"
+    note: 'Consider extracting to separate functions or using strategy pattern'
 
   - id: magic-string-pattern
-    message: "Magic string detected - consider constants"
+    message: 'Magic string detected - consider constants'
     severity: info
     language: typescript
     rule:
@@ -319,20 +375,20 @@ rules:
         - pattern: $VAR.includes('test')
         - pattern: $VAR.includes('dev')
         - pattern: $VAR.includes('start')
-    note: "Consider defining string constants for better maintainability"
+    note: 'Consider defining string constants for better maintainability'
 
   # === TESTING PATTERNS ===
 
   - id: mock-context-usage
-    message: "Mock context for testing"
+    message: 'Mock context for testing'
     severity: info
     language: typescript
     rule:
       pattern: mockContext
-    note: "Good practice: using mock context in tests"
+    note: 'Good practice: using mock context in tests'
 
   - id: expect-assertions
-    message: "Test assertions"
+    message: 'Test assertions'
     severity: info
     language: typescript
     rule:
@@ -340,49 +396,48 @@ rules:
         - pattern: expect($VAL).toContain($$$)
         - pattern: expect($VAL).toBeDefined()
         - pattern: expect($VAL).not.toContain($$$)
-    note: "Test assertions for validation"
+    note: 'Test assertions for validation'
 
   # === IMPORT/EXPORT CONSISTENCY ===
 
   - id: bun-test-import-standard
-    message: "Standard Bun test framework import"
+    message: 'Standard Bun test framework import'
     severity: info
     language: typescript
     rule:
       pattern: import { $$$IMPORTS } from 'bun:test'
     note: "Using Bun's native test framework consistently"
 
-
   - id: relative-import-js-extension
-    message: "Relative import with .js extension"
+    message: 'Relative import with .js extension'
     severity: info
     language: typescript
     rule:
       pattern: import { $$$IMPORTS } from './$MODULE.js'
-    note: "Good practice: explicit .js extensions for ES modules"
+    note: 'Good practice: explicit .js extensions for ES modules'
 
   # === MONOREPO PATTERNS ===
 
   - id: workspace-discovery-usage
-    message: "Workspace discovery function usage"
+    message: 'Workspace discovery function usage'
     severity: info
     language: typescript
     rule:
       any:
         - pattern: discoverWorkspaces($DIR)
         - pattern: findWorkspaceWithScript($WORKSPACES, $SCRIPT)
-    note: "Good practice: using workspace discovery for monorepo support"
+    note: 'Good practice: using workspace discovery for monorepo support'
 
   - id: workspace-info-interface
-    message: "WorkspaceInfo interface usage"
+    message: 'WorkspaceInfo interface usage'
     severity: info
     language: typescript
     rule:
-      pattern: ": WorkspaceInfo"
-    note: "Type safety: using WorkspaceInfo interface for workspace data"
+      pattern: ': WorkspaceInfo'
+    note: 'Type safety: using WorkspaceInfo interface for workspace data'
 
   - id: workspace-parameter-support
-    message: "Workspace parameter in tool args"
+    message: 'Workspace parameter in tool args'
     severity: info
     language: typescript
     rule:
@@ -393,10 +448,10 @@ rules:
         args: {
           $$$
         }
-    note: "Good practice: supporting workspace parameter for monorepo targeting"
+    note: 'Good practice: supporting workspace parameter for monorepo targeting'
 
   - id: workspace-relative-path-usage
-    message: "Workspace relative path handling"
+    message: 'Workspace relative path handling'
     severity: info
     language: typescript
     rule:
@@ -404,55 +459,55 @@ rules:
         - pattern: targetWorkspace.relativePath
         - pattern: workspace.relativePath
         - pattern: $WORKSPACE.relativePath
-    note: "Good practice: using relative paths for workspace identification"
+    note: 'Good practice: using relative paths for workspace identification'
 
   - id: workspace-name-fallback
-    message: "Workspace name with fallback pattern"
+    message: 'Workspace name with fallback pattern'
     severity: info
     language: typescript
     rule:
       pattern: $WORKSPACE.name || $WORKSPACE.relativePath
-    note: "Good practice: providing fallback when workspace name unavailable"
+    note: 'Good practice: providing fallback when workspace name unavailable'
 
   - id: execution-directory-workspace
-    message: "Execution directory set from workspace"
+    message: 'Execution directory set from workspace'
     severity: info
     language: typescript
     rule:
       pattern: |
         executionDir = $WORKSPACE.path
-    note: "Good practice: setting execution directory from workspace path"
+    note: 'Good practice: setting execution directory from workspace path'
 
   - id: workspace-script-not-found
-    message: "Workspace-aware script not found error"
+    message: 'Workspace-aware script not found error'
     severity: info
     language: typescript
     rule:
       pattern: |
         Script "$SCRIPT" not found in any workspace
-    note: "Good UX: workspace-aware error messages for script discovery"
+    note: 'Good UX: workspace-aware error messages for script discovery'
 
   # === DEV SERVER PATTERNS ===
 
   - id: dev-server-detection
-    message: "Dev server script detection"
+    message: 'Dev server script detection'
     severity: info
     language: typescript
     rule:
       pattern: isDevServerScript($CMD, $ARGS)
-    note: "Good practice: detecting dev server scripts for appropriate handling"
+    note: 'Good practice: detecting dev server scripts for appropriate handling'
 
   - id: dev-server-recommendation
-    message: "Dev server tool recommendation"
+    message: 'Dev server tool recommendation'
     severity: info
     language: typescript
     rule:
       pattern: |
         kit_devStart { script: "$SCRIPT"
-    note: "Good UX: recommending appropriate tools for dev servers"
+    note: 'Good UX: recommending appropriate tools for dev servers'
 
   - id: background-process-management
-    message: "Background process management usage"
+    message: 'Background process management usage'
     severity: info
     language: typescript
     rule:
@@ -461,10 +516,10 @@ rules:
         - pattern: kit_devStatus
         - pattern: kit_devStop
         - pattern: kit_devRestart
-    note: "Good practice: using background process management for dev servers"
+    note: 'Good practice: using background process management for dev servers'
 
   - id: dev-script-timeout-handling
-    message: "Dev script timeout consideration"
+    message: 'Dev script timeout consideration'
     severity: warning
     language: typescript
     rule:
@@ -477,13 +532,13 @@ rules:
         })
     constraints:
       TIME:
-        regex: "^[0-9]000$"
-    note: "Consider longer timeouts for dev servers or recommend kit_devStart"
+        regex: '^[0-9]000$'
+    note: 'Consider longer timeouts for dev servers or recommend kit_devStart'
 
   # === RECURSIVE DISCOVERY PATTERNS ===
 
   - id: recursive-directory-search
-    message: "Recursive directory search implementation"
+    message: 'Recursive directory search implementation'
     severity: info
     language: typescript
     rule:
@@ -495,22 +550,62 @@ rules:
           }
           $$$
         }
-    note: "Good practice: recursive directory traversal for workspace discovery"
+    note: 'Good practice: recursive directory traversal for workspace discovery'
 
   - id: node-modules-exclusion
-    message: "Node modules directory exclusion"
+    message: 'Node modules directory exclusion'
     severity: info
     language: typescript
     rule:
       any:
         - pattern: $ENTRY.name !== 'node_modules'
         - pattern: $FILENAME !== 'node_modules'
-    note: "Good practice: excluding node_modules from recursive searches"
+    note: 'Good practice: excluding node_modules from recursive searches'
 
   - id: hidden-directory-exclusion
-    message: "Hidden directory exclusion"
+    message: 'Hidden directory exclusion'
     severity: info
     language: typescript
     rule:
       pattern: $NAME.startsWith('.')
-    note: "Pattern detected: hidden directory check (should be excluded)"
+    note: 'Pattern detected: hidden directory check (should be excluded)'
+
+  # === TUI SAFETY PATTERNS ===
+
+  - id: console-log-forbidden
+    message: 'Console.log statement breaks TUI - remove immediately'
+    severity: error
+    language: typescript
+    rule:
+      any:
+        - pattern: console.log($$$)
+        - pattern: console.warn($$$)
+        - pattern: console.error($$$)
+        - pattern: console.info($$$)
+        - pattern: console.debug($$$)
+        - pattern: console.trace($$$)
+    note: 'NEVER use console statements in kit tools - they break the TUI interface'
+
+  - id: process-stdout-forbidden
+    message: 'Direct stdout/stderr writes break TUI'
+    severity: error
+    language: typescript
+    rule:
+      any:
+        - pattern: process.stdout.write($$$)
+        - pattern: process.stderr.write($$$)
+    note: 'Use proper formatting functions instead of direct stdout/stderr writes'
+
+  - id: console-methods-forbidden
+    message: 'Console methods break TUI interface'
+    severity: error
+    language: typescript
+    rule:
+      any:
+        - pattern: $VAR.log($$$)
+        - pattern: $VAR.warn($$$)
+        - pattern: $VAR.error($$$)
+    constraints:
+      VAR:
+        regex: 'console'
+    note: 'All console methods are forbidden in kit tools'

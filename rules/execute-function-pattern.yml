@@ -1,0 +1,8 @@
+id: execute-function-pattern
+message: "Standard execute function signature"
+severity: info
+language: typescript
+rule:
+  kind: method_definition
+  pattern: "async execute(args: ToolArgs, context: OpenCodeContext): Promise<string>"
+note: "Standard opencode tool execute function signature"

@@ -1,0 +1,8 @@
+id: missing-jsdoc-functions
+message: "Function missing JSDoc documentation"
+severity: warning
+language: typescript
+rule:
+  kind: function_declaration
+  pattern: "function $NAME($$$)"
+note: "Add JSDoc documentation for better maintainability"

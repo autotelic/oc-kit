@@ -1,0 +1,7 @@
+id: command-injection-risk
+message: "Potential command injection - ensure proper validation"
+severity: warning
+language: typescript
+rule:
+  pattern: "Bun.spawn([$CMD, $$$], $$$)"
+note: "Ensure command is properly validated/sanitized"

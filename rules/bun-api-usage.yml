@@ -1,0 +1,11 @@
+id: bun-api-usage
+message: "Bun native API usage"
+severity: info
+language: typescript
+rule:
+  any:
+    - pattern: Bun.spawn($$$)
+    - pattern: Bun.file($$$)
+    - pattern: Bun.resolveSync($$$)
+    - pattern: Bun.write($$$)
+note: "Using Bun native APIs for performance"

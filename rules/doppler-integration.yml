@@ -1,0 +1,7 @@
+id: doppler-integration
+message: "Doppler integration for environment variables"
+severity: info
+language: typescript
+rule:
+  pattern: wrapWithDoppler($$$)
+note: "Good practice: using Doppler for secure env var management"

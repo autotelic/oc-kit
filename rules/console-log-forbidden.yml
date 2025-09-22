@@ -1,0 +1,13 @@
+id: console-log-forbidden
+message: 'Console.log statement breaks TUI - remove immediately'
+severity: error
+language: typescript
+rule:
+  any:
+    - pattern: console.log($$$)
+    - pattern: console.warn($$$)
+    - pattern: console.error($$$)
+    - pattern: console.info($$$)
+    - pattern: console.debug($$$)
+    - pattern: console.trace($$$)
+note: 'NEVER use console statements in kit tools - they break the TUI interface'

@@ -1,0 +1,9 @@
+id: workspace-discovery-usage
+message: "Workspace discovery function usage"
+severity: info
+language: typescript
+rule:
+  any:
+    - pattern: discoverWorkspaces($DIR)
+    - pattern: findWorkspaceWithScript($WORKSPACES, $SCRIPT)
+note: "Good practice: using workspace discovery for monorepo support"

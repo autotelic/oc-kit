@@ -1,0 +1,8 @@
+id: proper-error-formatting
+message: "Proper error formatting pattern"
+severity: info
+language: typescript
+rule:
+  pattern: |
+    return `Error: ${($ERR as Error).message}`
+note: "Good practice: consistent error message formatting"

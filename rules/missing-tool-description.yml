@@ -1,0 +1,7 @@
+id: missing-tool-description
+message: "Tool export missing proper description"
+severity: warning
+language: typescript
+rule:
+  pattern: "export const $NAME = tool({ description: $DESC, $$$ })"
+note: "Tool descriptions should be descriptive (>20 chars) for better UX"

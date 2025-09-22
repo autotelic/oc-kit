@@ -1,0 +1,7 @@
+id: security-validation-required
+message: "Security validation should be applied"
+severity: warning
+language: typescript
+rule:
+  pattern: "if (!args.script)"
+note: "Consider adding security validation for script parameters"

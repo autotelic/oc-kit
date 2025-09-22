@@ -1,0 +1,7 @@
+id: missing-jsdoc-export-functions
+message: "Exported function missing JSDoc documentation"
+severity: error
+language: typescript
+rule:
+  pattern: "export function $NAME($$$)"
+note: "Public functions must have JSDoc documentation"

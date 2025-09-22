@@ -1,0 +1,7 @@
+id: dev-server-detection
+message: "Dev server script detection"
+severity: info
+language: typescript
+rule:
+  pattern: isDevServerScript($CMD, $ARGS)
+note: "Good practice: detecting dev server scripts for appropriate handling"

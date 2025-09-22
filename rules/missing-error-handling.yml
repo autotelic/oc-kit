@@ -1,0 +1,7 @@
+id: missing-error-handling
+message: "Missing error handling for async operations"
+severity: warning
+language: typescript
+rule:
+  pattern: "await $FUNC($$$)"
+note: "Consider adding try-catch for error handling"

@@ -4,4 +4,17 @@ severity: warning
 language: typescript
 rule:
   pattern: "await $FUNC($$$)"
+  not:
+    any:
+      - inside:
+          pattern: "try { $$$ } catch ($ERR) { $$$ }"
+      - inside:
+          pattern: "try { $$$ } catch { $$$ }"
+      - inside:
+          pattern: "try { $$$ } finally { $$$ }"
+      - inside:
+          pattern: "try { $$$ } catch ($ERR) { $$$ } finally { $$$ }"
+      - inside:
+          pattern: "try { $$$ } catch { $$$ } finally { $$$ }"
+      - pattern: "await import($$$)"
 note: "Consider adding try-catch for error handling"

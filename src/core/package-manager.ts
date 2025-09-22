@@ -2,7 +2,7 @@
  * Package manager detection and utilities
  */
 
-import { readdir } from 'node:fs/promises'
+import { readdirSync } from 'fs'
 
 /**
  * Supported package managers for JavaScript/TypeScript projects
@@ -36,13 +36,17 @@ const PACKAGE_MANAGERS: PackageManagerConfig[] = [
  * @returns The detected package manager, defaults to 'npm' if none found
  */
 export async function detectPackageManager(dir: string): Promise<PackageManager> {
-  for (const { lockFile, manager } of PACKAGE_MANAGERS) {
-    const lockFilePath = `${dir}/${lockFile}`
-    const file = Bun.file(lockFilePath)
-    
-    if (await file.exists()) {
-      return manager
+  try {
+    for (const { lockFile, manager } of PACKAGE_MANAGERS) {
+      const lockFilePath = `${dir}/${lockFile}`
+      const file = Bun.file(lockFilePath)
+      
+      if (await file.exists()) {
+        return manager
+      }
     }
+  } catch (error) {
+    // If file system operations fail, default to npm
   }
   
   return 'npm'
@@ -54,8 +58,12 @@ export async function detectPackageManager(dir: string): Promise<PackageManager>
  * @returns Parsed package.json content as a record
  */
 export async function getPackageJson(workingDir: string): Promise<Record<string, unknown>> {
-  const packagePath = Bun.resolveSync('./package.json', workingDir)
-  return await Bun.file(packagePath).json() as Record<string, unknown>
+  try {
+    const packagePath = Bun.resolveSync('./package.json', workingDir)
+    return await Bun.file(packagePath).json() as Record<string, unknown>
+  } catch (error) {
+    throw new Error(`Failed to read package.json from ${workingDir}: ${error}`)
+  }
 }
 
 /**
@@ -112,10 +120,10 @@ export interface WorkspaceInfo {
 export async function discoverWorkspaces(rootDir: string): Promise<WorkspaceInfo[]> {
   const workspaces: WorkspaceInfo[] = []
   
-  async function searchDirectory(currentDir: string) {
+  async function searchDirectory(currentDir: string): Promise<void> {
     try {
-      // Use readdir to get all directory contents including directories
-      const entries = await readdir(currentDir, { withFileTypes: true })
+      // Use sync fs operations for better reliability with Bun
+      const entries = readdirSync(currentDir, { withFileTypes: true })
       
       let hasPackageJson = false
       const subdirectories: string[] = []
@@ -149,14 +157,23 @@ export async function discoverWorkspaces(rootDir: string): Promise<WorkspaceInfo
       
       // Recursively search subdirectories
       for (const subdir of subdirectories) {
-        await searchDirectory(subdir)
+        try {
+          await searchDirectory(subdir)
+        } catch (error) {
+          // Skip directories we can't access - silent failure for workspace discovery
+        }
       }
     } catch (error) {
       // Skip directories we can't read - silent failure for workspace discovery
     }
   }
   
-  await searchDirectory(rootDir)
+  try {
+    await searchDirectory(rootDir)
+  } catch (error) {
+    // If root directory search fails, return empty array
+  }
+  
   return workspaces
 }
 

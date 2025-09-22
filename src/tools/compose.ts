@@ -155,61 +155,65 @@ function buildComposeCommand(args: ToolArgs, capabilities: any): string[] | stri
  * @returns Promise resolving to formatted command result
  */
 export async function executeComposeCommand(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = resolveWorkingDirectory(args, context)
-  const capabilities = await getDockerCapabilities(workingDir)
+  try {
+    const workingDir = resolveWorkingDirectory(args, context)
+    const capabilities = await getDockerCapabilities(workingDir)
 
-  // Validate Docker and Compose availability
-  const dockerValidation = validateDockerAvailable(capabilities)
-  if (!dockerValidation.valid) {
-    return dockerValidation.error!
-  }
+    // Validate Docker and Compose availability
+    const dockerValidation = validateDockerAvailable(capabilities)
+    if (!dockerValidation.valid) {
+      return dockerValidation.error!
+    }
 
-  const composeValidation = validateComposeAvailable(capabilities)
-  if (!composeValidation.valid) {
-    return composeValidation.error!
-  }
+    const composeValidation = validateComposeAvailable(capabilities)
+    if (!composeValidation.valid) {
+      return composeValidation.error!
+    }
 
-  const commandOrError = buildComposeCommand(args, capabilities)
-  if (typeof commandOrError === 'string') {
-    return commandOrError
-  }
+    const commandOrError = buildComposeCommand(args, capabilities)
+    if (typeof commandOrError === 'string') {
+      return commandOrError
+    }
 
-  const finalCommand = await wrapWithDoppler(commandOrError, workingDir, args.skipDoppler, args.action)
-  const timeout = getComposeTimeout(args.action || '', args.timeout)
+    const finalCommand = await wrapWithDoppler(commandOrError, workingDir, args.skipDoppler, args.action)
+    const timeout = getComposeTimeout(args.action || '', args.timeout)
 
-  // Check if this Compose command should use streaming
-  const [command, ...commandArgs] = finalCommand
-  if (!command) {
-    return 'Error: Invalid command structure'
-  }
+    // Check if this Compose command should use streaming
+    const [command, ...commandArgs] = finalCommand
+    if (!command) {
+      return 'Error: Invalid command structure'
+    }
 
-  const useStreaming = shouldUseStreaming(command, commandArgs) || 
-    ['up', 'build', 'pull', 'logs'].includes(args.action || '')
+    const useStreaming = shouldUseStreaming(command, commandArgs) || 
+      ['up', 'build', 'pull', 'logs'].includes(args.action || '')
 
-  if (useStreaming) {
-    // Use streaming execution for long-running Compose commands
-    const progressLogger = createProgressLogger('🐙')
-    const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
+    if (useStreaming) {
+      // Use streaming execution for long-running Compose commands
+      const progressLogger = createProgressLogger('🐙')
+      const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
 
-    const result = await executeWithStreaming(command, commandArgs, {
-      cwd: workingDir,
-      timeout,
-      onProgress: progressLogger,
-      onStdout,
-      onStderr
-    })
+      const result = await executeWithStreaming(command, commandArgs, {
+        cwd: workingDir,
+        timeout,
+        onProgress: progressLogger,
+        onStdout,
+        onStderr
+      })
 
-    // Convert streaming result to CommandResult format and use enhanced formatting
-    const commandResult = streamingToCommandResult(result)
-    return formatCommandResult(commandResult, args.action)
-  } else {
-    // Use regular execution for quick commands
-    const result = await executeCommand(finalCommand, {
-      cwd: workingDir,
-      timeout
-    })
+      // Convert streaming result to CommandResult format and use enhanced formatting
+      const commandResult = streamingToCommandResult(result)
+      return formatCommandResult(commandResult, args.action)
+    } else {
+      // Use regular execution for quick commands
+      const result = await executeCommand(finalCommand, {
+        cwd: workingDir,
+        timeout
+      })
 
-    return formatCommandResult(result, args.action)
+      return formatCommandResult(result, args.action)
+    }
+  } catch (error) {
+    return `Error executing Docker Compose command: ${error instanceof Error ? error.message : String(error)}`
   }
 }
 

@@ -347,7 +347,7 @@ export const run = tool({
  * @see https://opencode.ai/docs/custom-tools
  */
 export const list = tool({
-  description: 'List all available scripts in package.json',
+  description: 'List all available package.json scripts with workspace detection and filtering capabilities',
   args: {
     cwd: tool.schema.string().optional().describe('Working directory (defaults to current directory)')
   },

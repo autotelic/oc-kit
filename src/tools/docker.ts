@@ -178,56 +178,60 @@ function buildDockerCommand(args: ToolArgs): string[] | string {
  * @returns Promise resolving to formatted command result
  */
 export async function executeDockerCommand(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = resolveWorkingDirectory(args, context)
-  const capabilities = await getDockerCapabilities(workingDir)
+  try {
+    const workingDir = resolveWorkingDirectory(args, context)
+    const capabilities = await getDockerCapabilities(workingDir)
 
-  // Validate Docker availability
-  const dockerValidation = validateDockerAvailable(capabilities)
-  if (!dockerValidation.valid) {
-    return dockerValidation.error!
-  }
+    // Validate Docker availability
+    const dockerValidation = validateDockerAvailable(capabilities)
+    if (!dockerValidation.valid) {
+      return dockerValidation.error!
+    }
 
-  const commandOrError = buildDockerCommand(args)
-  if (typeof commandOrError === 'string') {
-    return commandOrError
-  }
+    const commandOrError = buildDockerCommand(args)
+    if (typeof commandOrError === 'string') {
+      return commandOrError
+    }
 
-  const finalCommand = await wrapWithDoppler(commandOrError, workingDir, args.skipDoppler, args.action)
-  const timeout = getDockerTimeout(args.action || '', args.timeout)
+    const finalCommand = await wrapWithDoppler(commandOrError, workingDir, args.skipDoppler, args.action)
+    const timeout = getDockerTimeout(args.action || '', args.timeout)
 
-  // Check if this Docker command should use streaming
-  const [command, ...commandArgs] = finalCommand
-  if (!command) {
-    return 'Error: Invalid command structure'
-  }
+    // Check if this Docker command should use streaming
+    const [command, ...commandArgs] = finalCommand
+    if (!command) {
+      return 'Error: Invalid command structure'
+    }
 
-  const useStreaming = shouldUseStreaming(command, commandArgs) || 
-    ['build', 'pull', 'logs', 'run'].includes(args.action || '')
+    const useStreaming = shouldUseStreaming(command, commandArgs) || 
+      ['build', 'pull', 'logs', 'run'].includes(args.action || '')
 
-  if (useStreaming) {
-    // Use streaming execution for long-running Docker commands
-    const progressLogger = createProgressLogger('🐳')
-    const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
+    if (useStreaming) {
+      // Use streaming execution for long-running Docker commands
+      const progressLogger = createProgressLogger('🐳')
+      const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
 
-    const result = await executeWithStreaming(command, commandArgs, {
-      cwd: workingDir,
-      timeout,
-      onProgress: progressLogger,
-      onStdout,
-      onStderr
-    })
+      const result = await executeWithStreaming(command, commandArgs, {
+        cwd: workingDir,
+        timeout,
+        onProgress: progressLogger,
+        onStdout,
+        onStderr
+      })
 
-    // Convert streaming result to CommandResult format and use enhanced formatting
-    const commandResult = streamingToCommandResult(result)
-    return formatCommandResult(commandResult, args.action)
-  } else {
-    // Use regular execution for quick commands
-    const result = await executeCommand(finalCommand, {
-      cwd: workingDir,
-      timeout
-    })
+      // Convert streaming result to CommandResult format and use enhanced formatting
+      const commandResult = streamingToCommandResult(result)
+      return formatCommandResult(commandResult, args.action)
+    } else {
+      // Use regular execution for quick commands
+      const result = await executeCommand(finalCommand, {
+        cwd: workingDir,
+        timeout
+      })
 
-    return formatCommandResult(result, args.action)
+      return formatCommandResult(result, args.action)
+    }
+  } catch (error) {
+    return `Error executing Docker command: ${error instanceof Error ? error.message : String(error)}`
   }
 }
 
@@ -238,80 +242,84 @@ export async function executeDockerCommand(args: ToolArgs, context: OpenCodeCont
  * @returns Promise resolving to formatted Docker capabilities report
  */
 export async function listDockerCapabilities(args: ToolArgs, context: OpenCodeContext): Promise<string> {
-  const workingDir = resolveWorkingDirectory(args, context)
-  const capabilities = await getDockerCapabilities(workingDir)
+  try {
+    const workingDir = resolveWorkingDirectory(args, context)
+    const capabilities = await getDockerCapabilities(workingDir)
 
-  const output: string[] = []
+    const output: string[] = []
 
-  output.push('=== Docker Capabilities ===')
-  output.push(`Docker Available: ${capabilities.dockerAvailable ? '✅' : '❌'}`)
-  output.push(`Dockerfiles Found: ${capabilities.dockerfiles.length}`)
-  output.push(`Compose Files Found: ${capabilities.composeFiles.length}`)
-  output.push('')
-
-  if (capabilities.dockerfiles.length > 0) {
-    output.push('📁 Dockerfiles:')
-    capabilities.dockerfiles.forEach(file => {
-      const relativePath = file.replace(workingDir, '.')
-      output.push(`  ${relativePath}`)
-    })
+    output.push('=== Docker Capabilities ===')
+    output.push(`Docker Available: ${capabilities.dockerAvailable ? '✅' : '❌'}`)
+    output.push(`Dockerfiles Found: ${capabilities.dockerfiles.length}`)
+    output.push(`Compose Files Found: ${capabilities.composeFiles.length}`)
     output.push('')
-  }
 
-  if (capabilities.composeFiles.length > 0) {
-    output.push('🐳 Docker Compose Files:')
-    capabilities.composeFiles.forEach(file => {
-      const relativePath = file.replace(workingDir, '.')
-      output.push(`  ${relativePath}`)
-    })
-    output.push('')
-  }
-
-  if (capabilities.services.size > 0) {
-    output.push('🔧 Discovered Services:')
-    Array.from(capabilities.services).sort().forEach(service => {
-      output.push(`  ${service}`)
-    })
-    output.push('')
-  }
-
-  if (Object.keys(capabilities.profiles).length > 0) {
-    output.push('📋 Auto-Generated Profiles:')
-    Object.entries(capabilities.profiles).forEach(([profile, services]) => {
-      output.push(`  ${profile}: [${services.join(', ')}]`)
-    })
-    output.push('')
-  }
-
-  if (capabilities.dockerAvailable) {
-    output.push('⚡ Available Tools:')
-    output.push('  kit_docker - Container operations (build, run, exec, logs, ps, etc.)')
-
-    if (capabilities.composeFiles.length > 0) {
-      output.push('  kit_compose - Docker Compose operations (up, down, build, logs, etc.)')
+    if (capabilities.dockerfiles.length > 0) {
+      output.push('📁 Dockerfiles:')
+      capabilities.dockerfiles.forEach(file => {
+        const relativePath = file.replace(workingDir, '.')
+        output.push(`  ${relativePath}`)
+      })
+      output.push('')
     }
 
-    output.push('')
-    output.push('📖 Usage Examples:')
-    output.push('  kit_docker { action: "ps" }')
-    output.push('  kit_docker { action: "build", tag: "myapp:latest" }')
-
     if (capabilities.composeFiles.length > 0) {
-      output.push('  kit_compose { action: "up" }')
-      output.push('  kit_compose { action: "up", profile: "database" }')
+      output.push('🐳 Docker Compose Files:')
+      capabilities.composeFiles.forEach(file => {
+        const relativePath = file.replace(workingDir, '.')
+        output.push(`  ${relativePath}`)
+      })
+      output.push('')
+    }
 
-      if (capabilities.services.size > 0) {
-        const firstService = Array.from(capabilities.services)[0]
-        output.push(`  kit_compose { action: "logs", services: ["${firstService}"] }`)
+    if (capabilities.services.size > 0) {
+      output.push('🔧 Discovered Services:')
+      Array.from(capabilities.services).sort().forEach(service => {
+        output.push(`  ${service}`)
+      })
+      output.push('')
+    }
+
+    if (Object.keys(capabilities.profiles).length > 0) {
+      output.push('📋 Auto-Generated Profiles:')
+      Object.entries(capabilities.profiles).forEach(([profile, services]) => {
+        output.push(`  ${profile}: [${services.join(', ')}]`)
+      })
+      output.push('')
+    }
+
+    if (capabilities.dockerAvailable) {
+      output.push('⚡ Available Tools:')
+      output.push('  kit_docker - Container operations (build, run, exec, logs, ps, etc.)')
+
+      if (capabilities.composeFiles.length > 0) {
+        output.push('  kit_compose - Docker Compose operations (up, down, build, logs, etc.)')
       }
-    }
-  } else {
-    output.push('❌ Docker Tools Unavailable:')
-    output.push('  Docker is not installed or not accessible.')
-    output.push('  Install Docker to enable kit_docker and kit_compose tools.')
-  }
 
-  return output.join('\n')
+      output.push('')
+      output.push('📖 Usage Examples:')
+      output.push('  kit_docker { action: "ps" }')
+      output.push('  kit_docker { action: "build", tag: "myapp:latest" }')
+
+      if (capabilities.composeFiles.length > 0) {
+        output.push('  kit_compose { action: "up" }')
+        output.push('  kit_compose { action: "up", profile: "database" }')
+
+        if (capabilities.services.size > 0) {
+          const firstService = Array.from(capabilities.services)[0]
+          output.push(`  kit_compose { action: "logs", services: ["${firstService}"] }`)
+        }
+      }
+    } else {
+      output.push('❌ Docker Tools Unavailable:')
+      output.push('  Docker is not installed or not accessible.')
+      output.push('  Install Docker to enable kit_docker and kit_compose tools.')
+    }
+
+    return output.join('\n')
+  } catch (error) {
+    return `Error listing Docker capabilities: ${error instanceof Error ? error.message : String(error)}`
+  }
 }
 
 // OpenCode plugin compatibility layer

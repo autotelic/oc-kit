@@ -103,19 +103,30 @@ export function executeWithStreaming(
       ;(async () => {
         try {
           while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            
-            const text = decoder.decode(value)
-            if (captureOutput) {
-              stdout += text
+            try {
+              const { done, value } = await reader.read()
+              if (done) break
+              
+              const text = decoder.decode(value)
+              if (captureOutput) {
+                stdout += text
+              }
+              onStdout?.(text)
+            } catch (error) {
+              // Stream read error - stop reading but don't fail the whole process
+              onProgress?.(`⚠️  Stdout stream error: ${error}`)
+              break
             }
-            onStdout?.(text)
           }
-        } catch {
-          // Reader failed, ignore
+        } catch (error) {
+          // Reader setup failed
+          onProgress?.(`⚠️  Stdout reader error: ${error}`)
         } finally {
-          reader.releaseLock()
+          try {
+            reader.releaseLock()
+          } catch {
+            // Ignore releaseLock errors
+          }
         }
       })()
     }
@@ -128,19 +139,30 @@ export function executeWithStreaming(
       ;(async () => {
         try {
           while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            
-            const text = decoder.decode(value)
-            if (captureOutput) {
-              stderr += text
+            try {
+              const { done, value } = await reader.read()
+              if (done) break
+              
+              const text = decoder.decode(value)
+              if (captureOutput) {
+                stderr += text
+              }
+              onStderr?.(text)
+            } catch (error) {
+              // Stream read error - stop reading but don't fail the whole process
+              onProgress?.(`⚠️  Stderr stream error: ${error}`)
+              break
             }
-            onStderr?.(text)
           }
-        } catch {
-          // Reader failed, ignore
+        } catch (error) {
+          // Reader setup failed
+          onProgress?.(`⚠️  Stderr reader error: ${error}`)
         } finally {
-          reader.releaseLock()
+          try {
+            reader.releaseLock()
+          } catch {
+            // Ignore releaseLock errors
+          }
         }
       })()
     }

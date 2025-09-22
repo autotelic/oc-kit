@@ -50,10 +50,15 @@ async function detectDopplerCapabilities(workingDir: string): Promise<DopplerCap
     configFile: null
   }
 
-  capabilities.available = await checkDopplerAvailability()
-  
-  if (capabilities.available) {
-    await checkDopplerConfig(workingDir, capabilities)
+  try {
+    capabilities.available = await checkDopplerAvailability()
+    
+    if (capabilities.available) {
+      await checkDopplerConfig(workingDir, capabilities)
+    }
+  } catch (error) {
+    // If detection fails, return defaults with error info
+    capabilities.error = `Failed to detect Doppler capabilities: ${error}`
   }
 
   return capabilities
@@ -89,34 +94,44 @@ async function checkDopplerAvailability(): Promise<boolean> {
 async function checkDopplerConfig(workingDir: string, capabilities: DopplerCapabilities) {
   // Check for doppler.yaml first
   const dopplerYaml = Bun.file(`${workingDir}/doppler.yaml`)
-  if (await dopplerYaml.exists()) {
-    try {
-      const content = await dopplerYaml.text()
-      if (content.trim()) {
-        capabilities.hasConfig = true
-        capabilities.configFile = 'doppler.yaml'
-        return
-      } else {
-        capabilities.error = 'doppler.yaml exists but is empty'
+  try {
+    if (await dopplerYaml.exists()) {
+      try {
+        const content = await dopplerYaml.text()
+        if (content.trim()) {
+          capabilities.hasConfig = true
+          capabilities.configFile = 'doppler.yaml'
+          return
+        } else {
+          capabilities.error = 'doppler.yaml exists but is empty'
+        }
+      } catch (error) {
+        capabilities.error = `Failed to read doppler.yaml: ${(error as Error).message}`
       }
-    } catch (error) {
-      capabilities.error = `Failed to read doppler.yaml: ${(error as Error).message}`
     }
+  } catch (error) {
+    capabilities.error = `Failed to check doppler.yaml existence: ${error}`
   }
 
   // Check for .doppler/cli.json
   const dopplerJson = Bun.file(`${workingDir}/.doppler/cli.json`)
-  if (await dopplerJson.exists()) {
-    try {
-      const content = await dopplerJson.text()
-      JSON.parse(content) // Validate it's valid JSON
-      capabilities.hasConfig = true
-      capabilities.configFile = '.doppler/cli.json'
-    } catch (error) {
-      capabilities.error = `Failed to parse .doppler/cli.json: ${(error as Error).message}`
+  try {
+    if (await dopplerJson.exists()) {
+      try {
+        const content = await dopplerJson.text()
+        JSON.parse(content) // Validate it's valid JSON
+        capabilities.hasConfig = true
+        capabilities.configFile = '.doppler/cli.json'
+      } catch (error) {
+        capabilities.error = `Failed to parse .doppler/cli.json: ${(error as Error).message}`
+      }
+    } else if (!capabilities.hasConfig) {
+      capabilities.error = 'No Doppler config found (doppler.yaml or .doppler/cli.json)'
     }
-  } else if (!capabilities.hasConfig) {
-    capabilities.error = 'No Doppler config found (doppler.yaml or .doppler/cli.json)'
+  } catch (error) {
+    if (!capabilities.hasConfig) {
+      capabilities.error = `Failed to check .doppler/cli.json existence: ${error}`
+    }
   }
 }
 
@@ -136,25 +151,30 @@ export async function wrapWithDoppler(
 ): Promise<string[]> {
   if (skipDoppler) return command
 
-  const capabilities = await getDopplerCapabilities(workingDir)
+  try {
+    const capabilities = await getDopplerCapabilities(workingDir)
 
-  if (!capabilities.available || !capabilities.hasConfig) {
+    if (!capabilities.available || !capabilities.hasConfig) {
+      return command
+    }
+
+    if (action && isReadOnlyAction(action)) {
+      return command
+    }
+
+    if (command[0] === 'docker' && command[1] && isReadOnlyAction(command[1])) {
+      return command
+    }
+
+    if (command[0] === 'docker-compose' && command.length > 1 && command[1] && isReadOnlyAction(command[1])) {
+      return command
+    }
+
+    return ['doppler', 'run', '--', ...command]
+  } catch (error) {
+    // If Doppler wrapping fails, return the original command
     return command
   }
-
-  if (action && isReadOnlyAction(action)) {
-    return command
-  }
-
-  if (command[0] === 'docker' && command[1] && isReadOnlyAction(command[1])) {
-    return command
-  }
-
-  if (command[0] === 'docker-compose' && command.length > 1 && command[1] && isReadOnlyAction(command[1])) {
-    return command
-  }
-
-  return ['doppler', 'run', '--', ...command]
 }
 
 /**

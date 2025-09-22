@@ -14,10 +14,15 @@ import { getOpenCodeTool } from '../core/plugin-compat.js'
 import { resolveWorkingDirectory, areDevToolsAvailable } from '../utils/common.js'
 
 // OpenCode plugin compatibility layer
-const tool = await getOpenCodeTool()
+let tool: any
+let DESCRIPTION: string
 
-// Load tool description
-const DESCRIPTION = await Bun.file(`${import.meta.dir}/../../tool/kit.txt`).text()
+try {
+  tool = await getOpenCodeTool()
+  DESCRIPTION = await Bun.file(`${import.meta.dir}/../../tool/kit.txt`).text()
+} catch (error) {
+  throw new Error(`Failed to initialize tool: ${(error as Error).message}`)
+}
 
 /**
  * Converts a StreamingResult to CommandResult format for consistent formatting
@@ -50,37 +55,42 @@ async function executeDevServerWithWarning(
   targetWorkspace: any,
   scriptName: string
 ): Promise<string> {
-  const useStreaming = shouldUseStreaming(command, commandArgs)
+  try {
+    const useStreaming = shouldUseStreaming(command, commandArgs)
 
-  if (useStreaming) {
-    // Use streaming execution with longer timeout for dev servers
-    const progressLogger = createProgressLogger('📦')
-    const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
+    if (useStreaming) {
+      // Use streaming execution with longer timeout for dev servers
+      const progressLogger = createProgressLogger('📦')
+      const { onStdout, onStderr } = createOutputStreamers('📤', '📥')
 
-    const result = await executeWithStreaming(command, commandArgs, {
-      cwd: executionDir,
-      timeout: 30000, // 30 seconds timeout for dev servers
-      onProgress: progressLogger,
-      onStdout,
-      onStderr
-    })
+      const result = await executeWithStreaming(command, commandArgs, {
+        cwd: executionDir,
+        timeout: 30000, // 30 seconds timeout for dev servers
+        onProgress: progressLogger,
+        onStdout,
+        onStderr
+      })
 
-    // Convert streaming result to CommandResult format and use enhanced formatting
-    const commandResult = streamingToCommandResult(result)
-    const workspaceNote = targetWorkspace.relativePath !== '.' 
-      ? ` (workspace: ${targetWorkspace.name || targetWorkspace.relativePath})`
-      : ''
-    return formatCommandResult(commandResult, `${scriptName}${workspaceNote}`)
-  } else {
-    // Use regular execution for quick commands
-    const result = await executeCommand([command, ...commandArgs], {
-      cwd: executionDir
-    })
+      // Convert streaming result to CommandResult format and use enhanced formatting
+      const commandResult = streamingToCommandResult(result)
+      const workspaceNote = targetWorkspace.relativePath !== '.' 
+        ? ` (workspace: ${targetWorkspace.name || targetWorkspace.relativePath})`
+        : ''
+      return formatCommandResult(commandResult, `${scriptName}${workspaceNote}`)
+    } else {
+      // Use regular execution for quick commands
+      const result = await executeCommand([command, ...commandArgs], {
+        cwd: executionDir
+      })
 
-    const workspaceNote = targetWorkspace.relativePath !== '.' 
-      ? ` (workspace: ${targetWorkspace.name || targetWorkspace.relativePath})`
-      : ''
-    return formatCommandResult(result, `${scriptName}${workspaceNote}`)
+      const workspaceNote = targetWorkspace.relativePath !== '.' 
+        ? ` (workspace: ${targetWorkspace.name || targetWorkspace.relativePath})`
+        : ''
+      return formatCommandResult(result, `${scriptName}${workspaceNote}`)
+    }
+  } catch (error) {
+    // Format execution errors consistently
+    return `❌ Failed to execute ${scriptName}: ${error instanceof Error ? error.message : String(error)}`
   }
 }
 

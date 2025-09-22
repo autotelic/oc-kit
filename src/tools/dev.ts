@@ -654,7 +654,12 @@ async function executeDevStartAll(args: ToolArgs, context: OpenCodeContext): Pro
 }
 
 // OpenCode plugin compatibility layer
-const tool = await getOpenCodeTool()
+let tool: any
+try {
+  tool = await getOpenCodeTool()
+} catch (error) {
+  throw new Error(`Failed to initialize OpenCode tool: ${(error as Error).message}`)
+}
 
 /**
  * Custom opencode tool for starting a development server in the background using OpenCode's Task system.

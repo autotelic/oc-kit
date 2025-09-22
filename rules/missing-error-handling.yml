@@ -1,20 +1,26 @@
-id: missing-error-handling
-message: "Missing error handling for async operations"
-severity: warning
-language: typescript
+id: missing-error-handling-improved
+message: "Async call without proper error handling. Consider wrapping in try-catch block."
+severity: error
+language: TypeScript
 rule:
-  pattern: "await $FUNC($$$)"
+  pattern: await $CALL
   not:
-    any:
-      - inside:
-          pattern: "try { $$$ } catch ($ERR) { $$$ }"
-      - inside:
-          pattern: "try { $$$ } catch { $$$ }"
-      - inside:
-          pattern: "try { $$$ } finally { $$$ }"
-      - inside:
-          pattern: "try { $$$ } catch ($ERR) { $$$ } finally { $$$ }"
-      - inside:
-          pattern: "try { $$$ } catch { $$$ } finally { $$$ }"
-      - pattern: "await import($$$)"
-note: "Consider adding try-catch for error handling"
+    inside:
+      stopBy: end
+      any:
+        - kind: try_statement
+        - kind: catch_clause  
+        - pattern: |
+            try {
+              $$$
+            } catch ($ERR) {
+              $$$
+            }
+        - pattern: |
+            try {
+              $$$
+            } catch ($ERR) {
+              $$$
+            } finally {
+              $$$
+            }

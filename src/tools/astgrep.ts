@@ -10,7 +10,12 @@ import { getOpenCodeTool } from '../core/plugin-compat.js'
 import { resolveWorkingDirectory } from '../utils/common.js'
 
 // OpenCode plugin compatibility layer
-const tool = await getOpenCodeTool()
+let tool: any
+try {
+  tool = await getOpenCodeTool()
+} catch (error) {
+  throw new Error(`Failed to initialize OpenCode tool: ${(error as Error).message}`)
+}
 
 /**
  * Executes ast-grep pattern search with semantic code understanding

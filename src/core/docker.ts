@@ -31,17 +31,23 @@ export async function getDockerCapabilities(
   dockerCapabilitiesCache = null;
   cacheDir = null;
 
-  dockerCachePromise = detectDockerCapabilities(workingDir);
-  const capabilities = await dockerCachePromise;
+  try {
+    dockerCachePromise = detectDockerCapabilities(workingDir);
+    const capabilities = await dockerCachePromise;
 
-  // eslint-disable-next-line require-atomic-updates
-  dockerCapabilitiesCache = capabilities;
-  // eslint-disable-next-line require-atomic-updates
-  cacheDir = workingDir;
-  // eslint-disable-next-line require-atomic-updates
-  dockerCachePromise = null;
+    // eslint-disable-next-line require-atomic-updates
+    dockerCapabilitiesCache = capabilities;
+    // eslint-disable-next-line require-atomic-updates
+    cacheDir = workingDir;
+    // eslint-disable-next-line require-atomic-updates
+    dockerCachePromise = null;
 
-  return capabilities;
+    return capabilities;
+  } catch (error) {
+    // eslint-disable-next-line require-atomic-updates
+    dockerCachePromise = null;
+    throw new Error(`Failed to get Docker capabilities: ${(error as Error).message}`);
+  }
 }
 
 /**
@@ -63,10 +69,15 @@ async function detectDockerCapabilities(
     profiles: {},
   };
 
-  capabilities.dockerAvailable = await checkDockerAvailability();
-  await findDockerfiles(workingDir, capabilities);
-  await findAndParseComposeFiles(workingDir, capabilities);
-  generateServiceProfiles(capabilities);
+  try {
+    capabilities.dockerAvailable = await checkDockerAvailability();
+    await findDockerfiles(workingDir, capabilities);
+    await findAndParseComposeFiles(workingDir, capabilities);
+    generateServiceProfiles(capabilities);
+  } catch (error) {
+    // Continue with partial capabilities on error
+    // Error details are available in the outer try-catch if needed
+  }
 
   return capabilities;
 }

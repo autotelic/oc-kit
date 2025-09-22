@@ -218,7 +218,12 @@ export async function executeComposeCommand(args: ToolArgs, context: OpenCodeCon
 }
 
 // OpenCode plugin compatibility layer
-const tool = await getOpenCodeTool()
+let tool: any
+try {
+  tool = await getOpenCodeTool()
+} catch (error) {
+  throw new Error(`Failed to initialize OpenCode tool: ${error instanceof Error ? error.message : String(error)}`)
+}
 
 /**
  * Custom opencode tool for executing Docker Compose operations.

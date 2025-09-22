@@ -25,17 +25,23 @@ export async function getDopplerCapabilities(workingDir: string): Promise<Dopple
     return dopplerCachePromise
   }
 
-  dopplerCachePromise = detectDopplerCapabilities(workingDir)
-  const capabilities = await dopplerCachePromise
+  try {
+    dopplerCachePromise = detectDopplerCapabilities(workingDir)
+    const capabilities = await dopplerCachePromise
 
-  // eslint-disable-next-line require-atomic-updates
-  dopplerCapabilitiesCache = capabilities
-  // eslint-disable-next-line require-atomic-updates
-  dopplerCacheDir = workingDir
-  // eslint-disable-next-line require-atomic-updates
-  dopplerCachePromise = null
+    // eslint-disable-next-line require-atomic-updates
+    dopplerCapabilitiesCache = capabilities
+    // eslint-disable-next-line require-atomic-updates
+    dopplerCacheDir = workingDir
+    // eslint-disable-next-line require-atomic-updates
+    dopplerCachePromise = null
 
-  return capabilities
+    return capabilities
+  } catch (error) {
+    // eslint-disable-next-line require-atomic-updates
+    dopplerCachePromise = null
+    throw new Error(`Failed to get Doppler capabilities: ${(error as Error).message}`)
+  }
 }
 
 /**
